@@ -5,7 +5,7 @@ import { ErrorMessage } from "../components/error-message";
 import { JobProgress } from "../components/job-progress";
 
 interface JobPageProps { client: KenkuiServerClient; jobId: string }
-const terminal = new Set(["succeeded", "failed", "cancelled"]);
+const cancelUnavailable: Record<string, true> = { succeeded: true, failed: true, cancelled: true, cancel_requested: true };
 
 export function JobPage({ client, jobId }: JobPageProps) {
   const [job, setJob] = useState<JobResponse>();
@@ -27,5 +27,5 @@ export function JobPage({ client, jobId }: JobPageProps) {
       const link = document.createElement("a"); link.href = url; link.download = `${jobId}.m4b`; link.click(); URL.revokeObjectURL(url);
     } catch (cause) { setError(cause); } finally { setDownloading(false); }
   };
-  return <main><h1>Job {jobId}</h1><ErrorMessage error={error} />{job ? <><JobProgress job={job} /><button type="button" onClick={cancel} disabled={terminal.has(job.status)}>Cancel job</button>{job.status === "succeeded" && <button type="button" onClick={download} disabled={downloading}>{downloading ? "Preparing download" : "Download M4B"}</button>}</> : <p>Loading job…</p>}</main>;
+  return <main><h1>Job {jobId}</h1><ErrorMessage error={error} />{job ? <><JobProgress job={job} /><button type="button" onClick={cancel} disabled={Boolean(cancelUnavailable[job.status])}>Cancel job</button>{job.status === "succeeded" && <button type="button" onClick={download} disabled={downloading}>{downloading ? "Preparing download" : "Download M4B"}</button>}</> : <p>Loading job…</p>}</main>;
 }

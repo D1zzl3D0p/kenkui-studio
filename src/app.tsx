@@ -27,6 +27,6 @@ export function App({ client = defaultClient, initialPath }: AppProps) {
     {route.page === "job" && route.jobId && <JobPage client={client} jobId={route.jobId} />}
     {route.page === "billing" && <BillingPage client={client} capabilities={capabilities} />}
     {route.page === "sign-in" && <SignInPage capabilities={capabilities} />}
-    {route.page === "jobs" && <JobsPage onOpen={(jobId) => navigate(`/jobs/${encodeURIComponent(jobId)}`)} onCreate={() => navigate("/jobs/new")} />}
+    {route.page === "jobs" && <JobsPage client={client} onOpen={(jobId) => navigate(`/jobs/${encodeURIComponent(jobId)}`)} onCreate={() => navigate("/jobs/new")} />}
   </>;
 }

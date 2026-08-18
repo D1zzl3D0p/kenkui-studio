@@ -10,7 +10,9 @@ export interface OutputRequest { format: string }
 export interface JobRequest { sourceId: string; chapters: string[]; casting: CastingRequest; tts: TtsRequest; output: OutputRequest }
 export interface PreflightResponse { sourceId: string; normalizedCharacters: number; valid?: boolean }
 export interface ProgressResponse { stage: string; completed: number; total: number }
-export interface JobResponse { id: string; status: string; progress: ProgressResponse }
+export type JobStatus = "queued" | "running" | "cancel_requested" | "succeeded" | "failed" | "cancelled";
+export interface JobResponse { id: string; status: JobStatus; progress: ProgressResponse }
+export interface JobListResponse { items: JobResponse[] }
 export interface EventResponse { sequence: number; type: string; progress: ProgressResponse }
 export interface ErrorDetail { code: string; message: string; requestId: string; details?: Record<string, unknown> }
 export interface ErrorResponse { error: ErrorDetail }

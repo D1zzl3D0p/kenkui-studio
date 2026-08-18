@@ -11,6 +11,7 @@ const client = {
   createJob: vi.fn().mockResolvedValue({ id: "job-1", status: "queued", progress: { stage: "queued", completed: 0, total: 1 } }),
   getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "queued", progress: { stage: "queued", completed: 0, total: 1 } }),
   events: vi.fn().mockReturnValue({ close: vi.fn(), onDisconnect: vi.fn() }),
+  jobs: vi.fn().mockResolvedValue({ items: [{ id: "job-1", status: "cancel_requested", progress: { stage: "synthesis", completed: 1, total: 2 } }] }),
 };
 
 describe("creation flow", () => {
@@ -31,5 +32,14 @@ describe("creation flow", () => {
     await waitFor(() => expect(client.createJob).toHaveBeenCalled());
     expect(client.preflight).toHaveBeenCalledWith(expect.objectContaining({ chapters: ["stable-chapter"], casting: { voiceId: "voice-1" } }));
     expect(client.createJob).toHaveBeenCalledWith(expect.any(Object), expect.any(String));
+  });
+});
+
+describe("jobs page", () => {
+  it("renders server-authoritative job snapshots", async () => {
+    render(<App client={client as never} initialPath="/jobs" />);
+
+    await expect(screen.findByText("cancel_requested")).resolves.toBeVisible();
+    expect(client.jobs).toHaveBeenCalled();
   });
 });

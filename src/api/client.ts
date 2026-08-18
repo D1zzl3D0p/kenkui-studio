@@ -1,7 +1,7 @@
 import { asApiError } from "./errors";
 import { connectJobEvents, type EventSourceFactory, type JobEventStream } from "./events";
 import type {
-  AssetResponse, BillingResponse, BookResponse, Capabilities, EventResponse, JobRequest, JobResponse,
+  AssetResponse, BillingResponse, BookResponse, Capabilities, EventResponse, JobListResponse, JobRequest, JobResponse,
   PreflightResponse, VoiceListResponse,
 } from "./generated/v1";
 
@@ -32,6 +32,7 @@ export class KenkuiServerClient {
   }
   async inspectBook(assetId: string): Promise<BookResponse> { return this.json(`/v1/assets/${encodeURIComponent(assetId)}/book`); }
   async preflight(payload: JobRequest): Promise<PreflightResponse> { return this.json("/v1/jobs/preflight", this.jsonBody(payload)); }
+  async jobs(): Promise<JobListResponse> { return this.json("/v1/jobs"); }
 
   async createJob(payload: JobRequest, idempotencyKey: string): Promise<JobResponse> {
     const init = this.jsonBody(payload, { "Idempotency-Key": idempotencyKey });

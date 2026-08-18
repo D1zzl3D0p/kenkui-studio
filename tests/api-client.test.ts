@@ -52,6 +52,12 @@ describe("KenkuiServerClient", () => {
 
     expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "progress" }));
   });
+  it("retrieves the server-authoritative job list", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [{ id: "job-1", status: "cancel_requested", progress: { stage: "cancelled", completed: 1, total: 2 } }] })));
+    const client = new KenkuiServerClient("http://server.test", { fetch: fetcher });
+
+    await expect(client.jobs()).resolves.toMatchObject({ items: [{ id: "job-1", status: "cancel_requested" }] });
+  });
 });
 
 class FakeEventSource {
