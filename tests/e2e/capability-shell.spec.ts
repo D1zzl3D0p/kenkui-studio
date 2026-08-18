@@ -7,6 +7,8 @@ test("completes an EPUB job through the mounted local server", async ({ page }) 
   await page.goto("/jobs/new");
   await page.getByLabel("EPUB source").setInputFiles("tests/fixtures/book.epub");
   await page.getByRole("button", { name: "Inspect source" }).click();
+  await expect(page.getByRole("heading", { name: "Chapters" })).toBeVisible();
+  await expect(page.getByLabel("Fixture chapter")).toBeChecked();
   await page.getByRole("button", { name: "Continue to casting" }).click();
   await page.getByRole("button", { name: "Continue to synthesis" }).click();
   await page.getByRole("button", { name: "Continue to output" }).click();
