@@ -28,7 +28,8 @@ export class KenkuiServerClient {
   async voices(): Promise<VoiceListResponse> { return this.json("/v1/voices"); }
 
   async upload(file: File): Promise<AssetResponse> {
-    return this.json("/v1/assets", { method: "POST", headers: { "Content-Type": "application/epub+zip" }, body: file });
+    const contentType = file.type || (file.name.toLowerCase().endsWith(".epub") ? "application/epub+zip" : "application/octet-stream");
+    return this.json("/v1/assets", { method: "POST", headers: { "Content-Type": contentType }, body: file });
   }
   async inspectBook(assetId: string): Promise<BookResponse> { return this.json(`/v1/assets/${encodeURIComponent(assetId)}/book`); }
   async preflight(payload: JobRequest): Promise<PreflightResponse> { return this.json("/v1/jobs/preflight", this.jsonBody(payload)); }

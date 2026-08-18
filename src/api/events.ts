@@ -14,6 +14,10 @@ export interface EventSourceLike {
 
 export type EventSourceFactory = new (url: string) => EventSourceLike;
 
+const terminalStatuses: Record<string, true> = { succeeded: true, failed: true, cancelled: true };
+const snapshotEvents: Record<string, true> = { completed: true, cancel_requested: true, failed: true, cancelled: true };
+const MAX_RECOVERY_ATTEMPTS = 3;
+
 export function connectJobEvents(
   url: string,
   EventSourceConstructor: EventSourceFactory,
@@ -21,20 +25,53 @@ export function connectJobEvents(
   onEvent?: (event: EventResponse) => void,
   onSnapshot?: (job: JobResponse) => void,
 ): JobEventStream {
-  const source = new EventSourceConstructor(url);
-  let reconnecting: Promise<JobResponse> | undefined;
+  let source: EventSourceLike | undefined;
+  let stopped = false;
+  let attempts = 0;
+  let retryTimer: number | undefined;
+  let recovering: Promise<JobResponse> | undefined;
+
+  const stop = () => {
+    stopped = true;
+    clearTimeout(retryTimer);
+    retryTimer = undefined;
+    source?.close();
+    source = undefined;
+  };
   const recover = async () => {
-    reconnecting ??= refetch().then((job) => {
+    recovering ??= refetch().then((job) => {
       onSnapshot?.(job);
+      if (terminalStatuses[job.status]) stop();
       return job;
-    }).finally(() => { reconnecting = undefined; });
-    return reconnecting;
+    }).finally(() => { recovering = undefined; });
+    return recovering;
   };
   const receive = (message: MessageEvent<string>) => {
-    try { onEvent?.(JSON.parse(message.data) as EventResponse); } catch { /* malformed display event */ }
+    try {
+      const event = JSON.parse(message.data) as EventResponse;
+      onEvent?.(event);
+      if (snapshotEvents[event.type]) void recover();
+    } catch { /* malformed display event */ }
   };
-  source.onmessage = receive;
-  for (const type of ["running", "progress", "succeeded", "failed", "cancelled"]) source.addEventListener(type, receive);
-  source.onerror = () => { void recover(); };
-  return { close: () => source.close(), onDisconnect: recover };
+  const connect = () => {
+    if (stopped) return;
+    const next = new EventSourceConstructor(url);
+    source = next;
+    next.onmessage = receive;
+    for (const type of ["running", "progress", "completed", "cancel_requested", "failed", "cancelled"]) next.addEventListener(type, receive);
+    next.onerror = () => {
+      if (stopped || attempts >= MAX_RECOVERY_ATTEMPTS) { stop(); return; }
+      attempts += 1;
+      next.close();
+      if (source === next) source = undefined;
+      void recover().then((job) => {
+        if (stopped || terminalStatuses[job.status]) return;
+        retryTimer = setTimeout(connect, attempts * 100);
+      }).catch(() => {
+        if (!stopped) retryTimer = setTimeout(connect, attempts * 100);
+      });
+    };
+  };
+  connect();
+  return { close: stop, onDisconnect: recover };
 }

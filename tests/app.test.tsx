@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { act } from "react";
 import { App } from "../src/app";
 
 const client = {
@@ -27,11 +28,83 @@ describe("creation flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue to synthesis" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue to output" }));
     fireEvent.click(screen.getByRole("button", { name: "Review job" }));
+    await screen.findByText("42 normalized characters");
     fireEvent.click(screen.getByRole("button", { name: "Start job" }));
 
     await waitFor(() => expect(client.createJob).toHaveBeenCalled());
     expect(client.preflight).toHaveBeenCalledWith(expect.objectContaining({ chapters: ["stable-chapter"], casting: { voiceId: "voice-1" } }));
     expect(client.createJob).toHaveBeenCalledWith(expect.any(Object), expect.any(String));
+  });
+});
+
+describe("preflight and capabilities", () => {
+  it("displays rejected preflight details and does not create the job", async () => {
+    const rejectedClient = {
+      ...client,
+      preflight: vi.fn().mockResolvedValue({ sourceId: "asset-1", normalizedCharacters: 42, valid: false }),
+      createJob: vi.fn(),
+    };
+    render(<App client={rejectedClient as never} initialPath="/jobs/new" />);
+    await screen.findByRole("heading", { name: "Source" });
+
+    fireEvent.change(screen.getByLabelText("EPUB source"), { target: { files: [new File(["epub"], "book.epub", { type: "application/epub+zip" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Inspect source" }));
+    await screen.findByText("Chapter 1");
+    fireEvent.click(screen.getByRole("button", { name: "Continue to casting" }));
+    await screen.findByRole("radio", { name: /Narrator/ });
+    fireEvent.click(screen.getByRole("button", { name: "Continue to synthesis" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to output" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review job" }));
+
+    await screen.findByText("42 normalized characters");
+    expect(screen.getByText("The server rejected this job configuration.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Start job" })).toBeDisabled();
+    expect(rejectedClient.createJob).not.toHaveBeenCalled();
+  });
+
+  it("derives source input types from server capabilities", async () => {
+    const pdfClient = {
+      ...client,
+      capabilities: vi.fn().mockResolvedValue({ apiVersion: "1", auth: { mode: "none" }, billing: { mode: "unmetered" }, casting: { mode: "single" }, outputFormats: ["m4b"], sourceFormats: ["pdf"] }),
+    };
+    render(<App client={pdfClient as never} initialPath="/jobs/new" />);
+
+    const input = await screen.findByLabelText("PDF source");
+    expect(input).toHaveAttribute("accept", "application/pdf,.pdf");
+  });
+
+  it("does not expose or fetch billing when the server is unmetered", async () => {
+    const unmeteredClient = { ...client, billing: vi.fn() };
+    render(<App client={unmeteredClient as never} initialPath="/billing" />);
+
+    await screen.findByText("Billing is unavailable on this server.");
+    expect(screen.queryByRole("link", { name: "Billing" })).not.toBeInTheDocument();
+    expect(unmeteredClient.billing).not.toHaveBeenCalled();
+  });
+});
+
+describe("job state", () => {
+  it("presents cancellation requested until the terminal completed event", async () => {
+    let emit: (event: { type: string; progress: { stage: string; completed: number; total: number } }) => void = () => undefined;
+    const jobClient = {
+      ...client,
+      getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "running", progress: { stage: "synthesis", completed: 1, total: 2 } }),
+      cancelJob: vi.fn().mockResolvedValue({ id: "job-1", status: "cancel_requested", progress: { stage: "cancelling", completed: 1, total: 2 } }),
+      events: vi.fn((_: string, onEvent: typeof emit) => {
+        emit = onEvent;
+        return { close: vi.fn(), onDisconnect: vi.fn() };
+      }),
+    };
+    render(<App client={jobClient as never} initialPath="/jobs/job-1" />);
+
+    await screen.findByText("Status: running");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel job" }));
+    await screen.findByText("Status: Cancellation requested");
+    expect(screen.getByRole("button", { name: "Cancel job" })).toBeDisabled();
+
+    act(() => emit({ type: "completed", progress: { stage: "complete", completed: 2, total: 2 } }));
+    await screen.findByText("Status: succeeded");
+    expect(screen.getByRole("button", { name: "Download M4B" })).toBeEnabled();
   });
 });
 

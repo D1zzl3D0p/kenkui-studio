@@ -6,6 +6,12 @@ import { JobProgress } from "../components/job-progress";
 
 interface JobPageProps { client: KenkuiServerClient; jobId: string }
 const cancelUnavailable: Record<string, true> = { succeeded: true, failed: true, cancelled: true, cancel_requested: true };
+const statusByEvent: Record<string, JobResponse["status"]> = {
+  completed: "succeeded",
+  cancel_requested: "cancel_requested",
+  failed: "failed",
+  cancelled: "cancelled",
+};
 
 export function JobPage({ client, jobId }: JobPageProps) {
   const [job, setJob] = useState<JobResponse>();
@@ -14,8 +20,12 @@ export function JobPage({ client, jobId }: JobPageProps) {
   useEffect(() => {
     let active = true;
     const update = (snapshot: JobResponse) => { if (active) setJob(snapshot); };
+    const updateFromEvent = (event: { type: string; progress: JobResponse["progress"] }) => {
+      if (!active) return;
+      setJob((current) => ({ id: jobId, status: statusByEvent[event.type] ?? current?.status ?? "running", progress: event.progress }));
+    };
     void client.getJob(jobId).then(update).catch(setError);
-    const stream = client.events(jobId, (event) => update({ id: jobId, status: job?.status ?? "running", progress: event.progress }), update);
+    const stream = client.events(jobId, updateFromEvent, update);
     return () => { active = false; stream.close(); };
   }, [client, jobId]);
   const cancel = async () => { try { setJob(await client.cancelJob(jobId)); } catch (cause) { setError(cause); } };
