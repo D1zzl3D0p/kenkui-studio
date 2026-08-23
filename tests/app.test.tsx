@@ -4,7 +4,7 @@ import { act } from "react";
 import { App } from "../src/app";
 
 const client = {
-  capabilities: vi.fn().mockResolvedValue({ apiVersion: "1", auth: { mode: "none" }, billing: { mode: "unmetered" }, casting: { mode: "single" }, outputFormats: ["m4b"], sourceFormats: ["epub"] }),
+  capabilities: vi.fn().mockResolvedValue({ apiVersion: "1", auth: { mode: "none" }, billing: { mode: "unmetered" }, casting: { modes: ["single"] }, outputFormats: ["m4b"], sourceFormats: ["epub"] }),
   upload: vi.fn().mockResolvedValue({ id: "asset-1", format: "epub", sha256: "hash" }),
   inspectBook: vi.fn().mockResolvedValue({ sourceId: "asset-1", title: "Book", author: "Author", chapters: [{ id: "stable-chapter", title: "Chapter 1" }] }),
   voices: vi.fn().mockResolvedValue({ items: [{ id: "voice-1", name: "Narrator", language: "en" }] }),
@@ -65,7 +65,7 @@ describe("preflight and capabilities", () => {
   it("derives source input types from server capabilities", async () => {
     const pdfClient = {
       ...client,
-      capabilities: vi.fn().mockResolvedValue({ apiVersion: "1", auth: { mode: "none" }, billing: { mode: "unmetered" }, casting: { mode: "single" }, outputFormats: ["m4b"], sourceFormats: ["pdf"] }),
+      capabilities: vi.fn().mockResolvedValue({ apiVersion: "1", auth: { mode: "none" }, billing: { mode: "unmetered" }, casting: { modes: ["single"] }, outputFormats: ["m4b"], sourceFormats: ["pdf"] }),
     };
     render(<App client={pdfClient as never} initialPath="/jobs/new" />);
 
