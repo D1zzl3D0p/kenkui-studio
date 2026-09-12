@@ -9,6 +9,7 @@ import { NewJobPage } from "./pages/new-job";
 import { SignInPage } from "./pages/sign-in";
 import { parseRoute } from "./router";
 import type { Host } from "./host/index";
+import { isSupportedApiVersion } from "./host/version";
 
 interface AppProps { client: KenkuiServerClient; host: Host; initialPath?: string }
 
@@ -23,6 +24,9 @@ export function App({ client, host, initialPath }: AppProps) {
     {host.can.chooseServer && <button type="button" onClick={() => navigate("/servers")}>Choose another server</button>}
   </main>;
   if (!capabilities) return <main><h1>Kenkui Studio</h1><p>Connecting to server…</p></main>;
+  if (!isSupportedApiVersion(capabilities)) return <main><h1>Kenkui Studio</h1>
+    <p>This version of Kenkui Studio is too old to talk to this server. Update it through your package manager.</p>
+  </main>;
   const route = parseRoute(path);
   const creditBilling = capabilities.billing.mode === "credits";
   return <><nav aria-label="Main navigation"><a href="/jobs" onClick={(event) => { event.preventDefault(); navigate("/jobs"); }}>Jobs</a><a href="/jobs/new" onClick={(event) => { event.preventDefault(); navigate("/jobs/new"); }}>New job</a>{creditBilling && <a href="/billing" onClick={(event) => { event.preventDefault(); navigate("/billing"); }}>Billing</a>}</nav>
