@@ -140,3 +140,37 @@ describe("connection failure", () => {
     expect(screen.queryByRole("button", { name: "Choose another server" })).not.toBeInTheDocument();
   });
 });
+
+describe("artifact download", () => {
+  it("delegates saving to the host", async () => {
+    const blob = new Blob(["audio"], { type: "audio/mp4" });
+    const succeeded = {
+      ...client,
+      getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "succeeded", progress: { stage: "complete", completed: 2, total: 2 } }),
+      artifact: vi.fn().mockResolvedValue(blob),
+    };
+    const host = fakeHost();
+
+    render(<App client={succeeded as never} host={host} initialPath="/jobs/job-1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Download M4B" }));
+
+    await waitFor(() => expect(host.saveArtifact).toHaveBeenCalledWith(blob, "job-1.m4b"));
+  });
+
+  it("refetches the job snapshot when the app returns to the foreground", async () => {
+    let resume: () => void = () => undefined;
+    const onDisconnect = vi.fn().mockResolvedValue(undefined);
+    const running = {
+      ...client,
+      getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "running", progress: { stage: "synthesis", completed: 1, total: 2 } }),
+      events: vi.fn().mockReturnValue({ close: vi.fn(), onDisconnect }),
+    };
+    const host = fakeHost({ onResume: (listener) => { resume = listener; return () => undefined; } });
+
+    render(<App client={running as never} host={host} initialPath="/jobs/job-1" />);
+    await screen.findByText("Status: running");
+    act(() => resume());
+
+    await waitFor(() => expect(onDisconnect).toHaveBeenCalled());
+  });
+});

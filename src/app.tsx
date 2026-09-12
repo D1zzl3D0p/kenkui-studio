@@ -27,7 +27,7 @@ export function App({ client, host, initialPath }: AppProps) {
   const creditBilling = capabilities.billing.mode === "credits";
   return <><nav aria-label="Main navigation"><a href="/jobs" onClick={(event) => { event.preventDefault(); navigate("/jobs"); }}>Jobs</a><a href="/jobs/new" onClick={(event) => { event.preventDefault(); navigate("/jobs/new"); }}>New job</a>{creditBilling && <a href="/billing" onClick={(event) => { event.preventDefault(); navigate("/billing"); }}>Billing</a>}</nav>
     {route.page === "new-job" && <NewJobPage client={client} capabilities={capabilities} onCreated={(jobId) => navigate(`/jobs/${encodeURIComponent(jobId)}`)} />}
-    {route.page === "job" && route.jobId && <JobPage client={client} jobId={route.jobId} />}
+    {route.page === "job" && route.jobId && <JobPage client={client} host={host} jobId={route.jobId} />}
     {route.page === "billing" && <BillingPage client={client} capabilities={capabilities} />}
     {route.page === "sign-in" && <SignInPage capabilities={capabilities} />}
     {route.page === "jobs" && <JobsPage client={client} onOpen={(jobId) => navigate(`/jobs/${encodeURIComponent(jobId)}`)} onCreate={() => navigate("/jobs/new")} />}
