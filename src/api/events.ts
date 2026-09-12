@@ -28,7 +28,7 @@ export function connectJobEvents(
   let source: EventSourceLike | undefined;
   let stopped = false;
   let attempts = 0;
-  let retryTimer: number | undefined;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let recovering: Promise<JobResponse> | undefined;
 
   const stop = () => {

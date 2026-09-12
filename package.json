@@ -19,6 +19,7 @@
     "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
+    "@types/node": "^22.20.2",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "jsdom": "latest",

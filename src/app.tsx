@@ -8,11 +8,12 @@ import { JobsPage } from "./pages/jobs";
 import { NewJobPage } from "./pages/new-job";
 import { SignInPage } from "./pages/sign-in";
 import { parseRoute } from "./router";
+import type { Host } from "./host/index";
 
-const defaultClient = new KenkuiServerClient();
-interface AppProps { client?: KenkuiServerClient; initialPath?: string }
+interface AppProps { client: KenkuiServerClient; host: Host; initialPath?: string }
 
-export function App({ client = defaultClient, initialPath }: AppProps) {
+export function App({ client, host, initialPath }: AppProps) {
+  void host;
   const [path, setPath] = useState(initialPath ?? window.location.pathname);
   const [capabilities, setCapabilities] = useState<Capabilities>();
   const [error, setError] = useState<unknown>();
