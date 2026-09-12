@@ -6,6 +6,7 @@ import { BillingPage } from "./pages/billing";
 import { JobPage } from "./pages/job";
 import { JobsPage } from "./pages/jobs";
 import { NewJobPage } from "./pages/new-job";
+import { ServersPage } from "./pages/servers";
 import { SignInPage } from "./pages/sign-in";
 import { parseRoute } from "./router";
 import type { Host } from "./host/index";
@@ -34,6 +35,7 @@ export function App({ client, host, initialPath }: AppProps) {
     {route.page === "job" && route.jobId && <JobPage client={client} host={host} jobId={route.jobId} />}
     {route.page === "billing" && <BillingPage client={client} capabilities={capabilities} />}
     {route.page === "sign-in" && <SignInPage capabilities={capabilities} />}
+    {route.page === "servers" && host.can.chooseServer && <ServersPage host={host} onSelect={() => navigate("/jobs")} />}
     {route.page === "jobs" && <JobsPage client={client} onOpen={(jobId) => navigate(`/jobs/${encodeURIComponent(jobId)}`)} onCreate={() => navigate("/jobs/new")} />}
   </>;
 }

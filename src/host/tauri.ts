@@ -1,6 +1,10 @@
 import { invoke as tauriInvoke, Channel } from "@tauri-apps/api/core";
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
-import type { Host, HostCapabilities } from "./index";
+import { load } from "@tauri-apps/plugin-store";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
+import { openUrl as openExternalUrl } from "@tauri-apps/plugin-opener";
+import type { Host, HostCapabilities, ServerEntry } from "./index";
 import { channelEventSourceFactory, type EventChannel, type EventFrame } from "./channel-event-source";
 
 type Invoke = (command: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -68,7 +72,7 @@ export async function createHost(): Promise<Host> {
       fetch: nativeFetch(invoke, baseUrl),
       eventSource: channelEventSourceFactory(openEventChannel(invoke)),
     }),
-    servers: await createNativeRegistry(),
+    servers: await createNativeRegistry(can),
     saveArtifact: async (blob, suggestedName) => { await saveBlob(blob, suggestedName, can); },
     openExternal: async (url) => { await openUrl(url); },
     onResume: (listener) => {
@@ -81,12 +85,49 @@ export async function createHost(): Promise<Host> {
   };
 }
 
-async function createNativeRegistry(): Promise<Host["servers"]> {
-  throw new Error("The native server registry is not implemented yet.");
+const cloud: ServerEntry = {
+  id: "cloud", label: "Kenkui Cloud", baseUrl: "https://api.kenkui.example", kind: "cloud",
+};
+
+function isLoopback(baseUrl: string): boolean {
+  const host = new URL(baseUrl).hostname;
+  return host === "localhost" || host === "127.0.0.1" || host === "::1";
 }
-async function saveBlob(_blob: Blob, _name: string, _can: HostCapabilities): Promise<void> {
-  throw new Error("Native artifact saving is not implemented yet.");
+
+async function createNativeRegistry(can: HostCapabilities): Promise<Host["servers"]> {
+  const store = await load("servers.json", { autoSave: true });
+  const read = async () => (await store.get<ServerEntry[]>("entries")) ?? [cloud];
+  const write = async (entries: ServerEntry[]) => { await store.set("entries", entries); };
+
+  return {
+    list: read,
+    selected: async () => {
+      const entries = await read();
+      const id = await store.get<string>("selected");
+      return entries.find((entry) => entry.id === id) ?? entries[0];
+    },
+    select: async (id) => { await store.set("selected", id); },
+    add: async (baseUrl, label) => {
+      const url = new URL(baseUrl);
+      if (!can.reachLoopback && isLoopback(baseUrl)) {
+        throw new Error("This device cannot reach a loopback address.");
+      }
+      const probe = await nativeFetch(tauriInvoke as unknown as Invoke, url.origin)(`${url.origin}/v1/capabilities`);
+      if (!probe.ok) throw new Error(`That server answered ${probe.status}.`);
+
+      const entry: ServerEntry = { id: url.origin, label: label ?? url.host, baseUrl: url.origin, kind: "custom" };
+      await write([...(await read()).filter((existing) => existing.id !== entry.id), entry]);
+      return entry;
+    },
+    remove: async (id) => { await write((await read()).filter((entry) => entry.id !== id)); },
+  };
 }
-async function openUrl(_url: string): Promise<void> {
-  throw new Error("Opening external links is not implemented yet.");
+
+async function saveBlob(blob: Blob, name: string, can: HostCapabilities): Promise<void> {
+  if (!can.saveToPath) throw new Error("This device cannot save to a chosen path.");
+  const path = await save({ defaultPath: name });
+  if (!path) return;
+  await writeFile(path, new Uint8Array(await blob.arrayBuffer()));
 }
+
+async function openUrl(url: string): Promise<void> { await openExternalUrl(url); }
