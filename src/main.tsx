@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
 import { KenkuiServerClient } from "./api/client";
-import { createHost } from "./host/web";
+import { createHost } from "@host";
 
 const host = await createHost();
 const server = await host.servers.selected();

@@ -14,7 +14,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": { "@host": ["./src/host/web.ts"] }
   },
   "include": ["src", "tests", "vite.config.ts"]
 }
