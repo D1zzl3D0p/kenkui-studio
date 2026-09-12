@@ -42,6 +42,7 @@ export interface Host {
   servers: ServerRegistry;
   saveArtifact(blob: Blob, suggestedName: string): Promise<void>;
   openExternal(url: string): Promise<void>;
+  onResume(listener: () => void): () => void;   // see §3.2, backgrounding
 }
 ```
 
