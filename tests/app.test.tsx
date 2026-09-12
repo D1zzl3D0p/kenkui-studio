@@ -117,3 +117,26 @@ describe("jobs page", () => {
     expect(client.jobs).toHaveBeenCalled();
   });
 });
+
+describe("connection failure", () => {
+  it("offers a server change when the host can choose servers", async () => {
+    const offline = { ...client, capabilities: vi.fn().mockRejectedValue(new Error("offline")) };
+    const host = fakeHost({
+      can: { chooseServer: true, reachLoopback: true, manageLocalServer: false, saveToPath: true },
+    });
+
+    render(<App client={offline as never} host={host} initialPath="/jobs" />);
+
+    await screen.findByText(/offline/);
+    expect(screen.getByRole("button", { name: "Choose another server" })).toBeVisible();
+  });
+
+  it("offers no server change in the browser, which has a fixed origin", async () => {
+    const offline = { ...client, capabilities: vi.fn().mockRejectedValue(new Error("offline")) };
+
+    render(<App client={offline as never} host={fakeHost()} initialPath="/jobs" />);
+
+    await screen.findByText(/offline/);
+    expect(screen.queryByRole("button", { name: "Choose another server" })).not.toBeInTheDocument();
+  });
+});
