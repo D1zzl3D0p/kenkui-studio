@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "generate:api": "openapi-typescript ../kenkui-server/openapi/v1.json -o src/api/generated/schema.ts --default-non-nullable false",
+    "test:e2e": "playwright test",
+    "check:api": "openapi-typescript ../kenkui-server/openapi/v1.json -o src/api/generated/schema.ts --default-non-nullable false --check",
+    "deploy:staging": "node scripts/deploy.mjs staging",
+    "deploy:production": "node scripts/deploy.mjs production"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -22,7 +27,9 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "jsdom": "latest",
+    "openapi-typescript": "7.13.0",
     "typescript": "latest",
-    "vitest": "latest"
+    "vitest": "latest",
+    "wrangler": "4.131.1"
   }
 }

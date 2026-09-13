@@ -7,9 +7,9 @@ export function BillingPage({ client, capabilities }: { client: KenkuiServerClie
   const [billing, setBilling] = useState<Record<string, string>>();
   const [error, setError] = useState<unknown>();
   useEffect(() => {
-    if (capabilities.billing.mode !== "credits") return;
+    if (capabilities.billing?.mode !== "credits") return;
     void client.billing().then(setBilling).catch(setError);
-  }, [client, capabilities.billing.mode]);
-  if (capabilities.billing.mode !== "credits") return <main><h1>Billing</h1><p>Billing is unavailable on this server.</p></main>;
-  return <main><h1>Billing</h1><p>Billing mode: {capabilities.billing.mode}</p><ErrorMessage error={error} />{billing && <dl>{Object.entries(billing).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>}</main>;
+  }, [client, capabilities.billing?.mode]);
+  if (capabilities.billing?.mode !== "credits") return <main><h1>Billing</h1><p>Billing is unavailable on this server.</p></main>;
+  return <main><h1>Billing</h1><p>Your beta allowance covers audiobook creation. Failed or cancelled jobs release their reserved credits.</p><ErrorMessage error={error} />{billing && <p>Available: {billing.availableCredits ?? "0"} credits. One credit covers 1,000 normalized speech characters.</p>}</main>;
 }

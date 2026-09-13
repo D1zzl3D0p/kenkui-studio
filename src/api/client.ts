@@ -23,6 +23,8 @@ export class KenkuiServerClient {
     this.getJobOverride = dependencies.getJob;
   }
 
+  authUrl(action: "login" | "logout"): string { return this.url(`/v1/auth/${action}`); }
+
   async capabilities(): Promise<Capabilities> { return this.json("/v1/capabilities"); }
   async billing(): Promise<BillingResponse> { return this.json("/v1/billing"); }
   async voices(): Promise<VoiceListResponse> { return this.json("/v1/voices"); }
@@ -48,22 +50,24 @@ export class KenkuiServerClient {
     return this.getJobOverride?.(jobId) ?? this.json(`/v1/jobs/${encodeURIComponent(jobId)}`);
   }
   async cancelJob(jobId: string): Promise<JobResponse> { return this.json(`/v1/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" }); }
+  artifactUrl(jobId: string): string { return this.url(`/v1/jobs/${encodeURIComponent(jobId)}/artifact`); }
+
   async artifact(jobId: string): Promise<Blob> {
-    const response = await this.request(this.url(`/v1/jobs/${encodeURIComponent(jobId)}/artifact`));
+    const response = await this.request(this.url(`/v1/jobs/${encodeURIComponent(jobId)}/artifact`), { credentials: "include" });
     if (!response.ok) throw await asApiError(response);
     return response.blob();
   }
 
-  events(jobId: string, onEvent?: (event: EventResponse) => void, onSnapshot?: (job: JobResponse) => void): JobEventStream {
+  events(jobId: string, onEvent?: (event: EventResponse) => void, onSnapshot?: (job: JobResponse) => void, onConnection?: (state: "connected" | "reconnecting" | "disconnected") => void): JobEventStream {
     if (!this.EventSourceConstructor) throw new Error("This browser does not support server-sent events.");
-    return connectJobEvents(this.url(`/v1/jobs/${encodeURIComponent(jobId)}/events`), this.EventSourceConstructor, () => this.getJob(jobId), onEvent, onSnapshot);
+    return connectJobEvents(this.url(`/v1/jobs/${encodeURIComponent(jobId)}/events`), this.EventSourceConstructor, () => this.getJob(jobId), onEvent, onSnapshot, onConnection);
   }
 
   private jsonBody(body: unknown, headers: HeadersInit = {}): RequestInit {
     return { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) };
   }
   private async json<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await this.request(this.url(path), init ?? {});
+    const response = await this.request(this.url(path), { credentials: "include", ...init });
     if (!response.ok) throw await asApiError(response);
     return response.json() as Promise<T>;
   }

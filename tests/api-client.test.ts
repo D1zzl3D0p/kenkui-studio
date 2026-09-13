@@ -99,3 +99,34 @@ class FakeEventSource {
   emit(type: string, payload: unknown) { for (const listener of this.listeners[type] ?? []) listener({ data: JSON.stringify(payload) } as MessageEvent<string>); }
   close() { this.closed(); }
 }
+
+
+it("recovers again after successful events reset consecutive failures", async () => {
+  const getJob = vi.fn().mockResolvedValue({ id: "job-1", status: "running", progress: { stage: "synthesis", completed: 1, total: 9 } });
+  const client = new KenkuiServerClient("", { getJob, eventSource: FakeEventSource });
+  const stream = client.events("job-1");
+  for (let sequence = 1; sequence <= 4; sequence += 1) {
+    const source = FakeEventSource.last;
+    source.emit("progress", { sequence, type: "progress", progress: { stage: "synthesis", completed: sequence, total: 9 } });
+    source.onerror?.(new Event("error"));
+    await vi.waitFor(() => expect(FakeEventSource.last).not.toBe(source));
+  }
+  expect(getJob).toHaveBeenCalledTimes(4);
+  stream.close();
+});
+
+it("reports disconnection when recovery is exhausted", async () => {
+  vi.useFakeTimers();
+  try {
+    const getJob = vi.fn().mockResolvedValue({ id: "job-1", status: "running", progress: { stage: "synthesis", completed: 1, total: 9 } });
+    const onConnection = vi.fn();
+    const client = new KenkuiServerClient("", { getJob, eventSource: FakeEventSource });
+    const stream = client.events("job-1", undefined, undefined, onConnection);
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      FakeEventSource.last.onerror?.(new Event("error"));
+      await vi.runAllTimersAsync();
+    }
+    expect(onConnection).toHaveBeenLastCalledWith("disconnected");
+    stream.close();
+  } finally { vi.useRealTimers(); }
+});

@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test("completes an EPUB job through the mounted local server", async ({ page }) => {
   const requests: string[] = [];
+  const serverErrors: string[] = [];
+  page.on("response", (response) => { if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`); });
   page.on("request", (request) => requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
 
   await page.goto("/jobs/new");
@@ -24,6 +26,7 @@ test("completes an EPUB job through the mounted local server", async ({ page }) 
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.m4b$/);
 
+  expect(serverErrors).toEqual([]);
   expect(requests).toEqual(expect.arrayContaining([
     "POST /v1/assets",
     expect.stringMatching(/^GET \/v1\/assets\/[^/]+\/book$/),

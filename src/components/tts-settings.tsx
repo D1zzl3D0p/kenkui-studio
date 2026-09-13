@@ -1,5 +1,3 @@
-interface TtsSettingsProps { normalizeText: boolean; onChange(value: boolean): void }
-
-export function TtsSettings({ normalizeText, onChange }: TtsSettingsProps) {
-  return <label><input type="checkbox" checked={normalizeText} onChange={(event) => onChange(event.target.checked)} />Normalize text</label>;
+export function TtsSettings() {
+  return <p>Text is automatically prepared for speech. Synthesis uses the server’s configured voice engine.</p>;
 }
