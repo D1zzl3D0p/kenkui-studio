@@ -23,7 +23,7 @@ from kenkui_server.app import create_app
 
 
 def main() -> None:
-    with TemporaryDirectory(prefix="kenkui-web-e2e-") as data_dir:
+    with TemporaryDirectory(prefix="kenkui-studio-e2e-") as data_dir:
         app = create_app(
             data_dir=data_dir,
             fixture_mode=True,
