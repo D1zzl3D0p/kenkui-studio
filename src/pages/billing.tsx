@@ -11,5 +11,5 @@ export function BillingPage({ client, capabilities }: { client: KenkuiServerClie
     void client.billing().then(setBilling).catch(setError);
   }, [client, capabilities.billing?.mode]);
   if (capabilities.billing?.mode !== "credits") return <main><h1>Billing</h1><p>Billing is unavailable on this server.</p></main>;
-  return <main><h1>Billing</h1><p>Your beta allowance covers audiobook creation. Failed or cancelled jobs release their reserved credits.</p><ErrorMessage error={error} />{billing && <p>Available: {billing.availableCredits ?? "0"} credits. One credit covers 1,000 normalized speech characters.</p>}</main>;
+  return <main><h1>Billing</h1><p>Your beta allowance covers audiobook creation. Failed or cancelled jobs release their reserved credits.</p><ErrorMessage error={error} />{billing && <p>Available: {billing.availableCredits ?? "0"} credits. Each book conversion costs a flat 1,000 credits, regardless of length.</p>}</main>;
 }

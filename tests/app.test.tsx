@@ -180,3 +180,26 @@ describe("artifact download", () => {
     await waitFor(() => expect(onDisconnect).toHaveBeenCalled());
   });
 });
+
+
+it("explains an insufficient flat-rate balance at review", async () => {
+  const pricedClient = { ...client,
+    preflight: vi.fn().mockResolvedValue({ sourceId: "asset-1", normalizedCharacters: 1189736,
+      valid: false, estimatedCredits: 1000, availableCredits: 999 }),
+    createJob: vi.fn(),
+  };
+  render(<App client={pricedClient as never} host={fakeHost()} initialPath="/jobs/new" />);
+  await screen.findByRole("heading", { name: "Source" });
+  fireEvent.change(screen.getByLabelText("EPUB source"), { target: { files: [new File(["epub"], "book.epub")] } });
+  fireEvent.click(screen.getByRole("button", { name: "Inspect source" }));
+  await screen.findByText("Chapter 1");
+  fireEvent.click(screen.getByRole("button", { name: "Continue to casting" }));
+  await screen.findByRole("radio", { name: /Narrator/ });
+  fireEvent.click(screen.getByRole("button", { name: "Continue to synthesis" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue to output" }));
+  fireEvent.click(screen.getByRole("button", { name: "Review job" }));
+  await screen.findByText("Book conversion: 1000 credits (flat rate). Available: 999 credits.");
+  expect(screen.getByRole("alert")).toHaveTextContent("You do not have enough credits for this book conversion.");
+  expect(screen.getByRole("button", { name: "Start job" })).toBeDisabled();
+  expect(pricedClient.createJob).not.toHaveBeenCalled();
+});
