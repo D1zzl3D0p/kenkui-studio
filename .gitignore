@@ -4,3 +4,7 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 .wrangler/
+__pycache__/
+.pytest_cache/
+src-tauri/target/
+src-tauri/gen/

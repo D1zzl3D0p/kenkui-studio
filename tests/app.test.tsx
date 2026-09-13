@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { App } from "../src/app";
+import { fakeHost } from "./fakes/host";
 
 const client = {
   capabilities: vi.fn().mockResolvedValue({ apiVersion: "1", auth: { mode: "none" }, billing: { mode: "unmetered" }, casting: { modes: ["single"] }, outputFormats: ["m4b"], sourceFormats: ["epub"] }),
@@ -17,7 +18,7 @@ const client = {
 
 describe("creation flow", () => {
   it("uses server-inspected chapter IDs and submits a preflighted single-voice job", async () => {
-    render(<App client={client as never} initialPath="/jobs/new" />);
+    render(<App client={client as never} host={fakeHost()} initialPath="/jobs/new" />);
     await screen.findByRole("heading", { name: "Source" });
 
     fireEvent.change(screen.getByLabelText("EPUB source"), { target: { files: [new File(["epub"], "book.epub", { type: "application/epub+zip" })] } });
@@ -44,7 +45,7 @@ describe("preflight and capabilities", () => {
       preflight: vi.fn().mockResolvedValue({ sourceId: "asset-1", normalizedCharacters: 42, valid: false }),
       createJob: vi.fn(),
     };
-    render(<App client={rejectedClient as never} initialPath="/jobs/new" />);
+    render(<App client={rejectedClient as never} host={fakeHost()} initialPath="/jobs/new" />);
     await screen.findByRole("heading", { name: "Source" });
 
     fireEvent.change(screen.getByLabelText("EPUB source"), { target: { files: [new File(["epub"], "book.epub", { type: "application/epub+zip" })] } });
@@ -67,7 +68,7 @@ describe("preflight and capabilities", () => {
       ...client,
       capabilities: vi.fn().mockResolvedValue({ apiVersion: "1", auth: { mode: "none" }, billing: { mode: "unmetered" }, casting: { modes: ["single"] }, outputFormats: ["m4b"], sourceFormats: ["pdf"] }),
     };
-    render(<App client={pdfClient as never} initialPath="/jobs/new" />);
+    render(<App client={pdfClient as never} host={fakeHost()} initialPath="/jobs/new" />);
 
     const input = await screen.findByLabelText("PDF source");
     expect(input).toHaveAttribute("accept", "application/pdf,.pdf");
@@ -75,7 +76,7 @@ describe("preflight and capabilities", () => {
 
   it("does not expose or fetch billing when the server is unmetered", async () => {
     const unmeteredClient = { ...client, billing: vi.fn() };
-    render(<App client={unmeteredClient as never} initialPath="/billing" />);
+    render(<App client={unmeteredClient as never} host={fakeHost()} initialPath="/billing" />);
 
     await screen.findByText("Billing is unavailable on this server.");
     expect(screen.queryByRole("link", { name: "Billing" })).not.toBeInTheDocument();
@@ -95,7 +96,7 @@ describe("job state", () => {
         return { close: vi.fn(), onDisconnect: vi.fn() };
       }),
     };
-    render(<App client={jobClient as never} initialPath="/jobs/job-1" />);
+    render(<App client={jobClient as never} host={fakeHost()} initialPath="/jobs/job-1" />);
 
     await screen.findByText("Status: running");
     fireEvent.click(screen.getByRole("button", { name: "Cancel job" }));
@@ -110,9 +111,72 @@ describe("job state", () => {
 
 describe("jobs page", () => {
   it("renders server-authoritative job snapshots", async () => {
-    render(<App client={client as never} initialPath="/jobs" />);
+    render(<App client={client as never} host={fakeHost()} initialPath="/jobs" />);
 
     await expect(screen.findByText("cancel_requested")).resolves.toBeVisible();
     expect(client.jobs).toHaveBeenCalled();
+  });
+});
+
+describe("connection failure", () => {
+  it("offers a server change when the host can choose servers", async () => {
+    const offline = { ...client, capabilities: vi.fn().mockRejectedValue(new Error("offline")) };
+    const host = fakeHost({
+      can: { chooseServer: true, reachLoopback: true, manageLocalServer: false, saveToPath: true },
+    });
+
+    render(<App client={offline as never} host={host} initialPath="/jobs" />);
+
+    await screen.findByText(/offline/);
+    expect(screen.getByRole("button", { name: "Choose another server" })).toBeVisible();
+  });
+
+  it("offers no server change in the browser, which has a fixed origin", async () => {
+    const offline = { ...client, capabilities: vi.fn().mockRejectedValue(new Error("offline")) };
+
+    render(<App client={offline as never} host={fakeHost()} initialPath="/jobs" />);
+
+    await screen.findByText(/offline/);
+    expect(screen.queryByRole("button", { name: "Choose another server" })).not.toBeInTheDocument();
+  });
+});
+
+describe("artifact download", () => {
+  it("delegates saving to the host", async () => {
+    const blob = new Blob(["audio"], { type: "audio/mp4" });
+    const succeeded = {
+      ...client,
+      getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "succeeded", progress: { stage: "complete", completed: 2, total: 2 } }),
+      artifact: vi.fn().mockResolvedValue(blob),
+      artifactUrl: vi.fn().mockReturnValue("/v1/jobs/job-1/artifact"),
+    };
+    const host = fakeHost();
+
+    render(<App client={succeeded as never} host={host} initialPath="/jobs/job-1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Download M4B" }));
+
+    await waitFor(() => expect(host.saveArtifact).toHaveBeenCalledWith(
+      { url: "/v1/jobs/job-1/artifact", load: expect.any(Function) }, "job-1.m4b",
+    ));
+    expect(succeeded.artifact).not.toHaveBeenCalled();
+    await vi.mocked(host.saveArtifact).mock.calls[0][0].load();
+    expect(succeeded.artifact).toHaveBeenCalledWith("job-1");
+  });
+
+  it("refetches the job snapshot when the app returns to the foreground", async () => {
+    let resume: () => void = () => undefined;
+    const onDisconnect = vi.fn().mockResolvedValue(undefined);
+    const running = {
+      ...client,
+      getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "running", progress: { stage: "synthesis", completed: 1, total: 2 } }),
+      events: vi.fn().mockReturnValue({ close: vi.fn(), onDisconnect }),
+    };
+    const host = fakeHost({ onResume: (listener) => { resume = listener; return () => undefined; } });
+
+    render(<App client={running as never} host={host} initialPath="/jobs/job-1" />);
+    await screen.findByText("Status: running");
+    act(() => resume());
+
+    await waitFor(() => expect(onDisconnect).toHaveBeenCalled());
   });
 });

@@ -9,7 +9,12 @@ from tempfile import TemporaryDirectory
 
 WEB_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = WEB_ROOT.parent
-SERVER_ROOT = REPOSITORY_ROOT / "kenkui-server"
+SERVER_ROOT = Path(os.environ.get("KENKUI_SERVER_ROOT") or REPOSITORY_ROOT / "kenkui-server").resolve()
+
+if os.environ.get("KENKUI_PRINT_SERVER_ROOT"):
+    print(SERVER_ROOT)
+    raise SystemExit(0)
+
 sys.path.insert(0, str(SERVER_ROOT / "src"))
 
 import kenkui as kk
