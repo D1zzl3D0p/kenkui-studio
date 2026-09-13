@@ -66,19 +66,24 @@ describe("KenkuiServerClient", () => {
     expect(FakeEventSource.last.closed).toHaveBeenCalledOnce();
   });
   it("bounds snapshot recovery after repeated stream errors", async () => {
+    vi.useFakeTimers();
+    try {
     const getJob = vi.fn().mockResolvedValue({ id: "job-1", status: "running", progress: { stage: "synthesis", completed: 1, total: 2 } });
     const client = new KenkuiServerClient("http://server.test", { getJob, eventSource: FakeEventSource });
-    client.events("job-1");
+    const stream = client.events("job-1");
 
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       const disconnected = FakeEventSource.last;
       disconnected.onerror?.(new Event("error"));
-      await vi.waitFor(() => expect(getJob).toHaveBeenCalledTimes(attempt));
-      await vi.waitFor(() => expect(FakeEventSource.last).not.toBe(disconnected), { timeout: attempt * 100 + 50 });
+      await vi.runAllTimersAsync();
+      expect(getJob).toHaveBeenCalledTimes(attempt);
+      expect(FakeEventSource.last).not.toBe(disconnected);
     }
     FakeEventSource.last.onerror?.(new Event("error"));
 
     expect(getJob).toHaveBeenCalledTimes(3);
+    stream.close();
+    } finally { vi.useRealTimers(); }
   });
   it("retrieves the server-authoritative job list", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [{ id: "job-1", status: "cancel_requested", progress: { stage: "cancelled", completed: 1, total: 2 } }] })));
