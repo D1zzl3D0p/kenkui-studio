@@ -8,3 +8,7 @@ __pycache__/
 .pytest_cache/
 src-tauri/target/
 src-tauri/gen/
+
+# Local agent caches and separately managed worktrees.
+/.claude/
+/.serena/
