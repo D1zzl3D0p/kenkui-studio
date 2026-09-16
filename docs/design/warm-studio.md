@@ -46,7 +46,7 @@ Servers without cover capabilities hide cover controls and use local records whe
 
 ## Verification and boundaries
 
-54 Studio unit tests cover request payloads, retry idempotency, account isolation, stale quotes, changed prices, insufficient funds, job cancellation/download and foreground recovery. Browser tests run against the real local API in deterministic fixture mode: EPUB + cover upload, draft reload, completion/download, mobile themes, and real sample-audio waveform activity. The server suite passes 138 tests, with six skipped for unavailable PostgreSQL/provisioned TTS. Coverage includes ownership, immutable source replacement, bearer identity and archive validation.
+57 Studio unit tests cover request payloads, retry idempotency, account isolation, stale quotes, changed prices, insufficient funds, job cancellation/download and foreground recovery. Browser tests run against the real local API in deterministic fixture mode: EPUB + cover upload, draft reload, completion/download, mobile themes, and real sample-audio waveform activity. The server suite passes 138 tests, with six skipped for unavailable PostgreSQL/provisioned TTS. Coverage includes ownership, immutable source replacement, bearer identity and archive validation.
 
 The web and native frontend builds are checked. This does not test a packaged desktop application, live Stripe payment, production PostgreSQL, or paid TTS inference. Browser fixture downloads validate delivery, not synthesis quality.
 
@@ -66,3 +66,5 @@ On this headless host, Playwright additionally needs `LD_LIBRARY_PATH=/tmp/kenku
 ## Local review server
 
 The isolated implementation is available at `http://192.168.84.5:5175/` while the development processes remain running. Port 5175 proxies to the deterministic fixture API on loopback port 4175. It supports actual EPUB/cover parsing, draft recovery and job delivery, but produces fixture audio, has one registered sample voice, and does not charge or call TTS. The original prototype on port 5174 is unchanged.
+
+A feature-by-feature comparison with the existing app and the precise server patch scope is recorded in [the implementation parity audit](implementation-parity.md).

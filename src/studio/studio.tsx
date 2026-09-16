@@ -568,6 +568,12 @@ export function Studio({
                   {menuDraft ? "Draft" : statusLabel(menuJob?.status || "")}
                 </span>
                 <p>{menuMeta.author}</p>
+                {menuJob && (
+                  <p className="quiet">
+                    {menuJob.progress.stage} · {menuJob.progress.completed}/
+                    {menuJob.progress.total || "?"}
+                  </p>
+                )}
               </div>
             </div>
             <button

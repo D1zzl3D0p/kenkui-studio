@@ -50,6 +50,7 @@ export function JobView({
       events = 0;
     setError(undefined);
     setJob(undefined);
+    setConnection("connected");
     const update = (snapshot: JobResponse) => {
       if (live) setJob((current) => ({ ...current, ...snapshot }));
     };
@@ -234,14 +235,7 @@ export function JobView({
                     Progress within the current stage. You can leave this page
                     and return later.
                   </p>
-                  <details>
-                    <summary>Progress details</summary>
-                    <p>
-                      {job.progress.completed} of{" "}
-                      {job.progress.total || "an unknown number of"} items ·{" "}
-                      {job.progress.stage}
-                    </p>
-                  </details>
+
                   <button
                     className="secondary"
                     disabled={busy || job.status === "cancel_requested"}
@@ -261,6 +255,17 @@ export function JobView({
                   </button>
                 </>
               )}
+              <details>
+                <summary>Conversion details</summary>
+                <p>
+                  Job ID: <code>{job.id}</code>
+                </p>
+                <p>Stage: {job.progress.stage}</p>
+                <p>
+                  {job.progress.completed} of{" "}
+                  {job.progress.total || "an unknown number of"} items
+                </p>
+              </details>
               {job.failure && <p role="alert">{job.failure.message}</p>}
               {["failed", "cancelled"].includes(job.status) && (
                 <p className="quiet">

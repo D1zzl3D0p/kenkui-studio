@@ -38,46 +38,34 @@ function makeClient<T extends object = {}>(extra: T = {} as T) {
         { id: "second", title: "Chapter two" },
       ],
     }),
-    voices: vi
-      .fn()
-      .mockResolvedValue({
-        items: [{ id: "voice-1", name: "Narrator", language: "en" }],
-      }),
-    preflight: vi
-      .fn()
-      .mockResolvedValue({
-        sourceId: "asset-1",
-        normalizedCharacters: 42,
-        valid: true,
-      }),
-    createJob: vi
-      .fn()
-      .mockResolvedValue({
-        id: "job-1",
-        status: "queued",
-        progress: { stage: "queued", completed: 0, total: 1 },
-      }),
-    getJob: vi
-      .fn()
-      .mockResolvedValue({
-        id: "job-1",
-        status: "running",
-        progress: { stage: "synthesis", completed: 1, total: 2 },
-      }),
-    cancelJob: vi
-      .fn()
-      .mockResolvedValue({
-        id: "job-1",
-        status: "cancel_requested",
-        progress: { stage: "cancelling", completed: 1, total: 2 },
-      }),
+    voices: vi.fn().mockResolvedValue({
+      items: [{ id: "voice-1", name: "Narrator", language: "en" }],
+    }),
+    preflight: vi.fn().mockResolvedValue({
+      sourceId: "asset-1",
+      normalizedCharacters: 42,
+      valid: true,
+    }),
+    createJob: vi.fn().mockResolvedValue({
+      id: "job-1",
+      status: "queued",
+      progress: { stage: "queued", completed: 0, total: 1 },
+    }),
+    getJob: vi.fn().mockResolvedValue({
+      id: "job-1",
+      status: "running",
+      progress: { stage: "synthesis", completed: 1, total: 2 },
+    }),
+    cancelJob: vi.fn().mockResolvedValue({
+      id: "job-1",
+      status: "cancel_requested",
+      progress: { stage: "cancelling", completed: 1, total: 2 },
+    }),
     jobs: vi.fn().mockResolvedValue({ items: [] }),
-    events: vi
-      .fn()
-      .mockReturnValue({
-        close: vi.fn(),
-        onDisconnect: vi.fn().mockResolvedValue(undefined),
-      }),
+    events: vi.fn().mockReturnValue({
+      close: vi.fn(),
+      onDisconnect: vi.fn().mockResolvedValue(undefined),
+    }),
     billing: vi
       .fn()
       .mockResolvedValue({ availableCredits: "500", checkoutEnabled: "false" }),
@@ -190,15 +178,13 @@ describe("real creation flow", () => {
   });
   it("submits server-supported full cast with model and fallback settings", async () => {
     const client = makeClient({
-      capabilities: vi
-        .fn()
-        .mockResolvedValue({
-          ...capabilities,
-          casting: {
-            modes: ["single", "characters"],
-            models: ["allowed-model"],
-          },
-        }),
+      capabilities: vi.fn().mockResolvedValue({
+        ...capabilities,
+        casting: {
+          modes: ["single", "characters"],
+          models: ["allowed-model"],
+        },
+      }),
     });
     render(<App client={client as never} host={fakeHost()} />);
     await upload();
@@ -226,15 +212,13 @@ describe("server quotes and billing", () => {
   it("blocks insufficient funds and never submits", async () => {
     const client = makeClient({
       capabilities: vi.fn().mockResolvedValue(priced),
-      preflight: vi
-        .fn()
-        .mockResolvedValue({
-          sourceId: "asset-1",
-          normalizedCharacters: 42,
-          valid: false,
-          estimatedCredits: 200,
-          availableCredits: 100,
-        }),
+      preflight: vi.fn().mockResolvedValue({
+        sourceId: "asset-1",
+        normalizedCharacters: 42,
+        valid: false,
+        estimatedCredits: 200,
+        availableCredits: 100,
+      }),
     });
     render(<App client={client as never} host={fakeHost()} />);
     await upload();
@@ -250,15 +234,13 @@ describe("server quotes and billing", () => {
   it("requires a second confirmation if the server price changes at submission", async () => {
     const client = makeClient({
       capabilities: vi.fn().mockResolvedValue(priced),
-      preflight: vi
-        .fn()
-        .mockResolvedValue({
-          sourceId: "asset-1",
-          normalizedCharacters: 42,
-          valid: true,
-          estimatedCredits: 100,
-          availableCredits: 500,
-        }),
+      preflight: vi.fn().mockResolvedValue({
+        sourceId: "asset-1",
+        normalizedCharacters: 42,
+        valid: true,
+        estimatedCredits: 100,
+        availableCredits: 500,
+      }),
     });
     render(<App client={client as never} host={fakeHost()} />);
     await upload();
@@ -441,4 +423,115 @@ it("changes request idempotency only for semantic changes", () => {
   expect(requestFor(d).casting).toEqual({ voiceId: "v" });
   localStorage.setItem("broken", "{}");
   expect(readLibrary("broken")).toEqual({ drafts: [], records: [] });
+});
+
+describe("existing Studio feature parity", () => {
+  it("keeps job IDs and the last stage available after a failed conversion", async () => {
+    const client = makeClient({
+      getJob: vi.fn().mockResolvedValue({
+        id: "job-1",
+        status: "failed",
+        progress: { stage: "synthesis", completed: 2, total: 5 },
+        failure: { message: "Voice service unavailable" },
+      }),
+    });
+    render(
+      <App
+        client={client as never}
+        host={fakeHost()}
+        initialPath="/jobs/job-1"
+      />,
+    );
+    await screen.findByText("Voice service unavailable");
+    fireEvent.click(screen.getByText("Conversion details"));
+    expect(screen.getByText("job-1")).toBeVisible();
+    expect(screen.getByText("Stage: synthesis")).toBeVisible();
+    expect(screen.getByText("2 of 5 items")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Cancel conversion" }),
+    ).toBeNull();
+  });
+  it("preserves metadata, cover preference, casting method, model and output format", async () => {
+    const client = makeClient({
+      voices: vi.fn().mockResolvedValue({
+        items: [
+          { id: "voice-1", name: "Narrator", language: "en" },
+          { id: "voice-2", name: "Second voice", language: "en" },
+        ],
+      }),
+      capabilities: vi.fn().mockResolvedValue({
+        ...capabilities,
+        outputFormats: ["m4b", "mp3"],
+        casting: {
+          modes: ["single", "characters"],
+          models: ["first-model", "second-model"],
+        },
+      }),
+    });
+    render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Edited title" },
+    });
+    fireEvent.change(screen.getByLabelText("Author"), {
+      target: { value: "Edited author" },
+    });
+    fireEvent.click(screen.getByText("Advanced"));
+    fireEvent.click(screen.getByLabelText("Include book cover"));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Full cast/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Choose fallback voice" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Second voice/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Use voice" }));
+    fireEvent.click(screen.getByText("Advanced"));
+    fireEvent.change(screen.getByLabelText("Voice assignment"), {
+      target: { value: "random" },
+    });
+    fireEvent.change(screen.getByLabelText("Character analysis model"), {
+      target: { value: "second-model" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByText("Advanced"));
+    fireEvent.change(screen.getByLabelText("Audio format"), {
+      target: { value: "mp3" },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Create audiobook" }),
+      ).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create audiobook" }));
+    await waitFor(() => expect(client.createJob).toHaveBeenCalled());
+    expect(client.createJob.mock.calls[0][0]).toMatchObject({
+      casting: {
+        narratorVoiceId: "voice-1",
+        unknownVoiceId: "voice-2",
+        modelId: "second-model",
+        method: "random",
+      },
+      tts: { normalizeText: true },
+      output: {
+        title: "Edited title",
+        author: "Edited author",
+        sourceCover: false,
+        format: "mp3",
+      },
+    });
+  });
+  it("offers the existing sign-in flow when the session has expired", async () => {
+    const client = makeClient({
+      capabilities: vi
+        .fn()
+        .mockResolvedValue({ ...capabilities, auth: { mode: "session" } }),
+      session: vi.fn().mockRejectedValue(new Error("Session expired")),
+      authUrl: (action: string) => `/v1/auth/${action}`,
+    });
+    render(<App client={client as never} host={fakeHost()} />);
+    expect(
+      await screen.findByRole("link", { name: "Sign in" }),
+    ).toHaveAttribute("href", "/v1/auth/login");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+  });
 });
