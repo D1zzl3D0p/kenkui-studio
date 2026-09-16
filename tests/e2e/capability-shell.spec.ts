@@ -1,38 +1,110 @@
 import { expect, test } from "@playwright/test";
 
-test("completes an EPUB job through the mounted local server", async ({ page }) => {
-  const requests: string[] = [];
-  const serverErrors: string[] = [];
-  page.on("response", (response) => { if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`); });
-  page.on("request", (request) => requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
-
-  await page.goto("/jobs/new");
-  await page.getByLabel("EPUB source").setInputFiles("tests/fixtures/book.epub");
-  await page.getByRole("button", { name: "Inspect source" }).click();
-  await expect(page.getByRole("heading", { name: "Chapters" })).toBeVisible();
-  await expect(page.getByLabel("Fixture chapter")).toBeChecked();
-  await page.getByRole("button", { name: "Continue to casting" }).click();
-  await page.getByRole("button", { name: "Continue to synthesis" }).click();
-  await page.getByRole("button", { name: "Continue to output" }).click();
-  await page.getByRole("button", { name: "Review job" }).click();
-  await expect(page.getByText(/\d+ normalized characters/)).toBeVisible();
-
-  await page.getByRole("button", { name: "Start job" }).click();
-  await expect(page.getByText("Status: succeeded")).toBeVisible();
-  await expect.poll(() => requests.filter((entry) => /^GET \/v1\/jobs\/[^/]+$/.test(entry)).length).toBeGreaterThanOrEqual(2);
-
+test("uploads a cover, resumes a draft, and downloads a completed book", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("response", (r) => {
+    if (r.status() >= 500) errors.push(`${r.status()} ${r.url()}`);
+  });
+  await page.goto("/");
+  await page
+    .getByLabel("EPUB source")
+    .setInputFiles("tests/fixtures/book.epub");
+  await expect(
+    page.getByRole("heading", { name: "Book details" }),
+  ).toBeVisible();
+  await page.getByLabel("Title", { exact: true }).fill("My audiobook");
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+    "base64",
+  );
+  await page
+    .getByLabel("Upload cover")
+    .setInputFiles({ name: "cover.png", mimeType: "image/png", buffer: png });
+  await expect(
+    page.getByRole("button", { name: "Restore original cover" }),
+  ).toBeVisible();
+  await expect(page.locator(".book-identity img")).toBeVisible();
+  await page.getByRole("button", { name: "Kenkui Studio home" }).click();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "My audiobook — Draft, open actions" })
+    .click();
+  await page.getByRole("button", { name: "Continue setup" }).click();
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
+    "My audiobook",
+  );
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: /Full cast/ }).click();
+  await expect(page.getByText("Automatic character casting")).toBeVisible();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Create audiobook", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your audiobook is ready" }),
+  ).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download M4B" }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/\.m4b$/);
+  expect((await downloadPromise).suggestedFilename()).toBe("My audiobook.m4b");
+  await page.getByRole("button", { name: "Kenkui Studio home" }).click();
+  await expect(
+    page.getByRole("button", { name: "My audiobook — Ready, open actions" }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
 
-  expect(serverErrors).toEqual([]);
-  expect(requests).toEqual(expect.arrayContaining([
-    "POST /v1/assets",
-    expect.stringMatching(/^GET \/v1\/assets\/[^/]+\/book$/),
-    "POST /v1/jobs/preflight",
-    "POST /v1/jobs",
-    expect.stringMatching(/^GET \/v1\/jobs\/[^/]+\/events$/),
-    expect.stringMatching(/^GET \/v1\/jobs\/[^/]+\/artifact$/),
-  ]));
+test("mobile themes, exclusive voice auditions, and audio-driven waveform", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByLabel("Appearance").selectOption("light");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page
+    .getByLabel("EPUB source")
+    .setInputFiles("tests/fixtures/book.epub");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Change voice" }).click();
+  await page.getByRole("button", { name: "Preview Beatrix" }).click();
+  await expect(
+    page.getByRole("button", { name: "Pause Beatrix" }),
+  ).toBeVisible();
+  await expect
+    .poll(async () =>
+      page
+        .locator(".wave.speaking i")
+        .evaluateAll((bars) =>
+          bars.some(
+            (bar) =>
+              !["scaleY(0.16)", "scaleY(0.1)"].includes(
+                (bar as HTMLElement).style.transform,
+              ),
+          ),
+        ),
+    )
+    .toBe(true);
+  await page.screenshot({ path: "test-results/mobile-voice-picker.png" });
+  await page.getByRole("button", { name: "Use voice" }).click();
+  await expect(
+    page.getByRole("button", { name: "Preview Beatrix" }),
+  ).toHaveCount(0);
+  await page.getByLabel("Appearance").selectOption("dark");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Play example" }).click();
+  await expect(
+    page.getByRole("button", { name: "Pause example" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Pause example" }).click();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/mobile-create-dark.png",
+    fullPage: true,
+  });
 });

@@ -1,205 +1,444 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import { act } from "react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app";
 import { fakeHost } from "./fakes/host";
-
-const client = {
-  capabilities: vi.fn().mockResolvedValue({ apiVersion: "1", auth: { mode: "none" }, billing: { mode: "unmetered" }, casting: { modes: ["single"] }, outputFormats: ["m4b"], sourceFormats: ["epub"] }),
-  upload: vi.fn().mockResolvedValue({ id: "asset-1", format: "epub", sha256: "hash" }),
-  inspectBook: vi.fn().mockResolvedValue({ sourceId: "asset-1", title: "Book", author: "Author", chapters: [{ id: "stable-chapter", title: "Chapter 1" }] }),
-  voices: vi.fn().mockResolvedValue({ items: [{ id: "voice-1", name: "Narrator", language: "en" }] }),
-  preflight: vi.fn().mockResolvedValue({ sourceId: "asset-1", normalizedCharacters: 42, valid: true }),
-  createJob: vi.fn().mockResolvedValue({ id: "job-1", status: "queued", progress: { stage: "queued", completed: 0, total: 1 } }),
-  getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "queued", progress: { stage: "queued", completed: 0, total: 1 } }),
-  events: vi.fn().mockReturnValue({ close: vi.fn(), onDisconnect: vi.fn() }),
-  jobs: vi.fn().mockResolvedValue({ items: [{ id: "job-1", status: "cancel_requested", progress: { stage: "synthesis", completed: 1, total: 2 } }] }),
+import {
+  requestFor,
+  changeDraft,
+  readLibrary,
+  type Draft,
+} from "../src/studio/store";
+const capabilities = {
+  apiVersion: "1",
+  auth: { mode: "none" },
+  billing: { mode: "unmetered" },
+  casting: { modes: ["single"], models: [] },
+  outputFormats: ["m4b"],
+  sourceFormats: ["epub"],
 };
+function makeClient<T extends object = {}>(extra: T = {} as T) {
+  return {
+    storageScope: () => "test-server",
+    capabilities: vi.fn().mockResolvedValue(capabilities),
+    upload: vi
+      .fn()
+      .mockResolvedValue({ id: "asset-1", format: "epub", sha256: "hash" }),
+    inspectBook: vi.fn().mockResolvedValue({
+      sourceId: "asset-1",
+      title: "Book",
+      author: "Author",
+      chapters: [
+        { id: "stable-chapter", title: "Chapter one" },
+        { id: "second", title: "Chapter two" },
+      ],
+    }),
+    voices: vi
+      .fn()
+      .mockResolvedValue({
+        items: [{ id: "voice-1", name: "Narrator", language: "en" }],
+      }),
+    preflight: vi
+      .fn()
+      .mockResolvedValue({
+        sourceId: "asset-1",
+        normalizedCharacters: 42,
+        valid: true,
+      }),
+    createJob: vi
+      .fn()
+      .mockResolvedValue({
+        id: "job-1",
+        status: "queued",
+        progress: { stage: "queued", completed: 0, total: 1 },
+      }),
+    getJob: vi
+      .fn()
+      .mockResolvedValue({
+        id: "job-1",
+        status: "running",
+        progress: { stage: "synthesis", completed: 1, total: 2 },
+      }),
+    cancelJob: vi
+      .fn()
+      .mockResolvedValue({
+        id: "job-1",
+        status: "cancel_requested",
+        progress: { stage: "cancelling", completed: 1, total: 2 },
+      }),
+    jobs: vi.fn().mockResolvedValue({ items: [] }),
+    events: vi
+      .fn()
+      .mockReturnValue({
+        close: vi.fn(),
+        onDisconnect: vi.fn().mockResolvedValue(undefined),
+      }),
+    billing: vi
+      .fn()
+      .mockResolvedValue({ availableCredits: "500", checkoutEnabled: "false" }),
+    session: vi.fn().mockResolvedValue({ userId: "person-a" }),
+    ...extra,
+  };
+}
+beforeEach(() => {
+  window.history.replaceState({}, "", "/");
+  localStorage.clear();
+  sessionStorage.clear();
+  vi.stubGlobal("scrollTo", vi.fn());
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute("open", "");
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute("open");
+  };
+});
+async function upload() {
+  const input = await screen.findByLabelText("EPUB source");
+  fireEvent.change(input, {
+    target: {
+      files: [
+        new File(["epub"], "book.epub", { type: "application/epub+zip" }),
+      ],
+    },
+  });
+  await screen.findByRole("heading", { name: "Book details" });
+}
+async function review() {
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  await screen.findByRole("heading", { name: "Narration" });
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  await screen.findByRole("heading", { name: "Preview & create" });
+}
 
-describe("creation flow", () => {
-  it("uses server-inspected chapter IDs and submits a preflighted single-voice job", async () => {
-    render(<App client={client as never} host={fakeHost()} initialPath="/jobs/new" />);
-    await screen.findByRole("heading", { name: "Source" });
-
-    fireEvent.change(screen.getByLabelText("EPUB source"), { target: { files: [new File(["epub"], "book.epub", { type: "application/epub+zip" })] } });
-    fireEvent.click(screen.getByRole("button", { name: "Inspect source" }));
-    await screen.findByText("Chapter 1");
-    fireEvent.click(screen.getByRole("button", { name: "Continue to casting" }));
-    await screen.findByRole("radio", { name: /Narrator/ });
-    fireEvent.click(screen.getByRole("button", { name: "Continue to synthesis" }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue to output" }));
-    fireEvent.click(screen.getByRole("button", { name: "Review job" }));
-    await screen.findByText("42 normalized characters");
-    fireEvent.click(screen.getByRole("button", { name: "Start job" }));
-
+describe("real creation flow", () => {
+  it("uses stable chapter IDs, preflights before creation, and preserves the request key on retry", async () => {
+    const client = makeClient();
+    client.createJob.mockRejectedValueOnce(
+      new TypeError("Network unavailable"),
+    );
+    render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    fireEvent.click(screen.getByText("Advanced", { exact: true }));
+    fireEvent.click(screen.getByLabelText("Chapter two"));
+    await review();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Create audiobook" }),
+      ).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create audiobook" }));
+    await screen.findByText("Network unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Create audiobook" }));
+    await screen.findByRole("heading", { name: "Creating your audiobook" });
+    expect(client.createJob.mock.calls[0][0]).toMatchObject({
+      chapters: ["stable-chapter"],
+      casting: { voiceId: "voice-1" },
+    });
+    expect(client.createJob.mock.calls[0][1]).toBe(
+      client.createJob.mock.calls[1][1],
+    );
+    expect(client.preflight.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+  it("saves and resumes the draft without uploading the source again", async () => {
+    const client = makeClient();
+    const mounted = render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    fireEvent.change(screen.getByLabelText("Title", { exact: true }), {
+      target: { value: "My book" },
+    });
+    mounted.unmount();
+    window.history.replaceState({}, "", "/");
+    render(<App client={client as never} host={fakeHost()} />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "My book — Draft, open actions",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
+    expect(await screen.findByDisplayValue("My book")).toBeVisible();
+    expect(client.upload).toHaveBeenCalledTimes(1);
+  });
+  it("isolates saved drafts by server and signed-in account", async () => {
+    const client = makeClient({
+      capabilities: vi
+        .fn()
+        .mockResolvedValue({ ...capabilities, auth: { mode: "session" } }),
+    });
+    const mounted = render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    mounted.unmount();
+    window.history.replaceState({}, "", "/");
+    client.session.mockResolvedValue({ userId: "person-b" });
+    render(<App client={client as never} host={fakeHost()} />);
+    await screen.findByText(
+      "Your audiobooks and unfinished drafts will appear here.",
+    );
+    expect(screen.queryByRole("button", { name: /Book — Draft/ })).toBeNull();
+  });
+  it("submits server-supported full cast with model and fallback settings", async () => {
+    const client = makeClient({
+      capabilities: vi
+        .fn()
+        .mockResolvedValue({
+          ...capabilities,
+          casting: {
+            modes: ["single", "characters"],
+            models: ["allowed-model"],
+          },
+        }),
+    });
+    render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Full cast/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Create audiobook" }),
+      ).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create audiobook" }));
     await waitFor(() => expect(client.createJob).toHaveBeenCalled());
-    expect(client.preflight).toHaveBeenCalledWith(expect.objectContaining({ chapters: ["stable-chapter"], casting: { voiceId: "voice-1" } }));
-    expect(client.createJob).toHaveBeenCalledWith(expect.any(Object), expect.any(String));
+    expect(client.createJob.mock.calls[0][0].casting).toEqual({
+      narratorVoiceId: "voice-1",
+      unknownVoiceId: "voice-1",
+      modelId: "allowed-model",
+      method: "gendered",
+    });
   });
 });
 
-describe("preflight and capabilities", () => {
-  it("displays rejected preflight details and does not create the job", async () => {
-    const rejectedClient = {
-      ...client,
-      preflight: vi.fn().mockResolvedValue({ sourceId: "asset-1", normalizedCharacters: 42, valid: false }),
-      createJob: vi.fn(),
-    };
-    render(<App client={rejectedClient as never} host={fakeHost()} initialPath="/jobs/new" />);
-    await screen.findByRole("heading", { name: "Source" });
-
-    fireEvent.change(screen.getByLabelText("EPUB source"), { target: { files: [new File(["epub"], "book.epub", { type: "application/epub+zip" })] } });
-    fireEvent.click(screen.getByRole("button", { name: "Inspect source" }));
-    await screen.findByText("Chapter 1");
-    fireEvent.click(screen.getByRole("button", { name: "Continue to casting" }));
-    await screen.findByRole("radio", { name: /Narrator/ });
-    fireEvent.click(screen.getByRole("button", { name: "Continue to synthesis" }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue to output" }));
-    fireEvent.click(screen.getByRole("button", { name: "Review job" }));
-
-    await screen.findByText("42 normalized characters");
-    expect(screen.getByText("The server rejected this job configuration.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Start job" })).toBeDisabled();
-    expect(rejectedClient.createJob).not.toHaveBeenCalled();
+describe("server quotes and billing", () => {
+  const priced = { ...capabilities, billing: { mode: "credits" } };
+  it("blocks insufficient funds and never submits", async () => {
+    const client = makeClient({
+      capabilities: vi.fn().mockResolvedValue(priced),
+      preflight: vi
+        .fn()
+        .mockResolvedValue({
+          sourceId: "asset-1",
+          normalizedCharacters: 42,
+          valid: false,
+          estimatedCredits: 200,
+          availableCredits: 100,
+        }),
+    });
+    render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    await review();
+    await screen.findByText(
+      "You do not have enough credits for this book conversion.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Create · 200 credits" }),
+    ).toBeDisabled();
+    expect(client.createJob).not.toHaveBeenCalled();
   });
-
-  it("derives source input types from server capabilities", async () => {
-    const pdfClient = {
-      ...client,
-      capabilities: vi.fn().mockResolvedValue({ apiVersion: "1", auth: { mode: "none" }, billing: { mode: "unmetered" }, casting: { modes: ["single"] }, outputFormats: ["m4b"], sourceFormats: ["pdf"] }),
-    };
-    render(<App client={pdfClient as never} host={fakeHost()} initialPath="/jobs/new" />);
-
-    const input = await screen.findByLabelText("PDF source");
-    expect(input).toHaveAttribute("accept", "application/pdf,.pdf");
+  it("requires a second confirmation if the server price changes at submission", async () => {
+    const client = makeClient({
+      capabilities: vi.fn().mockResolvedValue(priced),
+      preflight: vi
+        .fn()
+        .mockResolvedValue({
+          sourceId: "asset-1",
+          normalizedCharacters: 42,
+          valid: true,
+          estimatedCredits: 100,
+          availableCredits: 500,
+        }),
+    });
+    render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    await review();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Create · 100 credits" }),
+      ).toBeEnabled(),
+    );
+    client.preflight.mockResolvedValue({
+      sourceId: "asset-1",
+      normalizedCharacters: 42,
+      valid: true,
+      estimatedCredits: 150,
+      availableCredits: 500,
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create · 100 credits" }),
+    );
+    await screen.findByText(
+      "The price has changed. Review the updated estimate and confirm again.",
+    );
+    expect(client.createJob).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create · 150 credits" }),
+    );
+    await waitFor(() => expect(client.createJob).toHaveBeenCalledOnce());
   });
-
-  it("does not expose or fetch billing when the server is unmetered", async () => {
-    const unmeteredClient = { ...client, billing: vi.fn() };
-    render(<App client={unmeteredClient as never} host={fakeHost()} initialPath="/billing" />);
-
+  it("invalidates the displayed quote immediately on setting change and ignores late results", async () => {
+    let oldResolve: (v: unknown) => void = () => {};
+    const client = makeClient({
+      capabilities: vi.fn().mockResolvedValue(priced),
+      preflight: vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              oldResolve = resolve;
+            }),
+        )
+        .mockResolvedValue({
+          sourceId: "asset-1",
+          normalizedCharacters: 20,
+          valid: true,
+          estimatedCredits: 50,
+          availableCredits: 500,
+        }),
+    });
+    render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    await waitFor(() => expect(client.preflight).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByText("Advanced", { exact: true }));
+    fireEvent.click(screen.getByLabelText("Chapter two"));
+    await screen.findByText("50 credits");
+    await act(async () =>
+      oldResolve({
+        sourceId: "asset-1",
+        normalizedCharacters: 42,
+        valid: true,
+        estimatedCredits: 100,
+        availableCredits: 500,
+      }),
+    );
+    expect(screen.queryByText("100 credits")).toBeNull();
+    expect(screen.getByText("50 credits")).toBeVisible();
+  });
+  it("does not fetch billing on an unmetered server", async () => {
+    const client = makeClient();
+    render(
+      <App client={client as never} host={fakeHost()} initialPath="/billing" />,
+    );
     await screen.findByText("Billing is unavailable on this server.");
-    expect(screen.queryByRole("link", { name: "Billing" })).not.toBeInTheDocument();
-    expect(unmeteredClient.billing).not.toHaveBeenCalled();
+    expect(client.billing).not.toHaveBeenCalled();
   });
 });
 
-describe("job state", () => {
-  it("presents cancellation requested until the terminal completed event", async () => {
-    let emit: (event: { type: string; progress: { stage: string; completed: number; total: number } }) => void = () => undefined;
-    const jobClient = {
-      ...client,
-      getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "running", progress: { stage: "synthesis", completed: 1, total: 2 } }),
-      cancelJob: vi.fn().mockResolvedValue({ id: "job-1", status: "cancel_requested", progress: { stage: "cancelling", completed: 1, total: 2 } }),
-      events: vi.fn((_: string, onEvent: typeof emit) => {
-        emit = onEvent;
+describe("job lifecycle and host behavior", () => {
+  it("keeps cancellation pending and enables real host download only at completion", async () => {
+    let emit: (event: any) => void = () => {};
+    const host = fakeHost();
+    const client = makeClient({
+      events: vi.fn((_: string, fn: typeof emit) => {
+        emit = fn;
         return { close: vi.fn(), onDisconnect: vi.fn() };
       }),
-    };
-    render(<App client={jobClient as never} host={fakeHost()} initialPath="/jobs/job-1" />);
-
-    await screen.findByText("Status: running");
-    fireEvent.click(screen.getByRole("button", { name: "Cancel job" }));
-    await screen.findByText("Status: Cancellation requested");
-    expect(screen.getByRole("button", { name: "Cancel job" })).toBeDisabled();
-
-    act(() => emit({ type: "completed", progress: { stage: "complete", completed: 2, total: 2 } }));
-    await screen.findByText("Status: succeeded");
-    expect(screen.getByRole("button", { name: "Download M4B" })).toBeEnabled();
-  });
-});
-
-describe("jobs page", () => {
-  it("renders server-authoritative job snapshots", async () => {
-    render(<App client={client as never} host={fakeHost()} initialPath="/jobs" />);
-
-    await expect(screen.findByText("cancel_requested")).resolves.toBeVisible();
-    expect(client.jobs).toHaveBeenCalled();
-  });
-});
-
-describe("connection failure", () => {
-  it("offers a server change when the host can choose servers", async () => {
-    const offline = { ...client, capabilities: vi.fn().mockRejectedValue(new Error("offline")) };
-    const host = fakeHost({
-      can: { chooseServer: true, reachLoopback: true, manageLocalServer: false, saveToPath: true },
-    });
-
-    render(<App client={offline as never} host={host} initialPath="/jobs" />);
-
-    await screen.findByText(/offline/);
-    expect(screen.getByRole("button", { name: "Choose another server" })).toBeVisible();
-  });
-
-  it("offers no server change in the browser, which has a fixed origin", async () => {
-    const offline = { ...client, capabilities: vi.fn().mockRejectedValue(new Error("offline")) };
-
-    render(<App client={offline as never} host={fakeHost()} initialPath="/jobs" />);
-
-    await screen.findByText(/offline/);
-    expect(screen.queryByRole("button", { name: "Choose another server" })).not.toBeInTheDocument();
-  });
-});
-
-describe("artifact download", () => {
-  it("delegates saving to the host", async () => {
-    const blob = new Blob(["audio"], { type: "audio/mp4" });
-    const succeeded = {
-      ...client,
-      getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "succeeded", progress: { stage: "complete", completed: 2, total: 2 } }),
-      artifact: vi.fn().mockResolvedValue(blob),
       artifactUrl: vi.fn().mockReturnValue("/v1/jobs/job-1/artifact"),
-    };
-    const host = fakeHost();
-
-    render(<App client={succeeded as never} host={host} initialPath="/jobs/job-1" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Download M4B" }));
-
-    await waitFor(() => expect(host.saveArtifact).toHaveBeenCalledWith(
-      { url: "/v1/jobs/job-1/artifact", load: expect.any(Function) }, "job-1.m4b",
-    ));
-    expect(succeeded.artifact).not.toHaveBeenCalled();
+      artifact: vi.fn().mockResolvedValue(new Blob(["audio"])),
+    });
+    render(
+      <App client={client as never} host={host} initialPath="/jobs/job-1" />,
+    );
+    await screen.findByText("Status: running");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel conversion" }));
+    await screen.findByText("Status: Cancellation requested");
+    expect(
+      screen.getByRole("button", { name: "Cancel conversion" }),
+    ).toBeDisabled();
+    client.getJob.mockResolvedValue({
+      id: "job-1",
+      status: "succeeded",
+      progress: { stage: "complete", completed: 2, total: 2 },
+    });
+    act(() =>
+      emit({
+        type: "completed",
+        progress: { stage: "complete", completed: 2, total: 2 },
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Download M4B" }),
+    );
+    await waitFor(() =>
+      expect(host.saveArtifact).toHaveBeenCalledWith(
+        { url: "/v1/jobs/job-1/artifact", load: expect.any(Function) },
+        "Audiobook.m4b",
+      ),
+    );
+    expect(client.artifact).not.toHaveBeenCalled();
     await vi.mocked(host.saveArtifact).mock.calls[0][0].load();
-    expect(succeeded.artifact).toHaveBeenCalledWith("job-1");
+    expect(client.artifact).toHaveBeenCalledWith("job-1");
   });
-
-  it("refetches the job snapshot when the app returns to the foreground", async () => {
-    let resume: () => void = () => undefined;
-    const onDisconnect = vi.fn().mockResolvedValue(undefined);
-    const running = {
-      ...client,
-      getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "running", progress: { stage: "synthesis", completed: 1, total: 2 } }),
-      events: vi.fn().mockReturnValue({ close: vi.fn(), onDisconnect }),
-    };
-    const host = fakeHost({ onResume: (listener) => { resume = listener; return () => undefined; } });
-
-    render(<App client={running as never} host={host} initialPath="/jobs/job-1" />);
+  it("recovers after returning to the foreground", async () => {
+    let resume = () => {};
+    const client = makeClient(),
+      host = fakeHost({
+        onResume: (fn) => {
+          resume = fn;
+          return () => {};
+        },
+      });
+    render(
+      <App client={client as never} host={host} initialPath="/jobs/job-1" />,
+    );
     await screen.findByText("Status: running");
     act(() => resume());
-
-    await waitFor(() => expect(onDisconnect).toHaveBeenCalled());
+    await waitFor(() => expect(client.getJob).toHaveBeenCalledTimes(2));
+  });
+  it("allows changing servers while the current one is unreachable", async () => {
+    const client = makeClient({
+      capabilities: vi.fn().mockRejectedValue(new Error("offline")),
+    });
+    const host = fakeHost({
+      can: {
+        chooseServer: true,
+        reachLoopback: true,
+        manageLocalServer: false,
+        saveToPath: true,
+      },
+    });
+    render(<App client={client as never} host={host} />);
+    await screen.findByText("offline");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Choose another server" }),
+    );
+    await screen.findByRole("heading", { name: /server/i });
   });
 });
 
-
-it("explains an insufficient flat-rate balance at review", async () => {
-  const pricedClient = { ...client,
-    preflight: vi.fn().mockResolvedValue({ sourceId: "asset-1", normalizedCharacters: 1189736,
-      valid: false, estimatedCredits: 1000, availableCredits: 999 }),
-    createJob: vi.fn(),
+it("changes request idempotency only for semantic changes", () => {
+  const d: Draft = {
+    id: "draft",
+    book: { sourceId: "source", title: "Book", author: "A", chapters: [] },
+    originalSourceId: "source",
+    title: "Book",
+    author: "A",
+    chapters: ["c"],
+    narrator: "v",
+    mode: "single",
+    model: "",
+    unknown: "",
+    method: "gendered",
+    format: "m4b",
+    sourceCover: true,
+    step: 1,
+    key: "same",
+    updated: 1,
   };
-  render(<App client={pricedClient as never} host={fakeHost()} initialPath="/jobs/new" />);
-  await screen.findByRole("heading", { name: "Source" });
-  fireEvent.change(screen.getByLabelText("EPUB source"), { target: { files: [new File(["epub"], "book.epub")] } });
-  fireEvent.click(screen.getByRole("button", { name: "Inspect source" }));
-  await screen.findByText("Chapter 1");
-  fireEvent.click(screen.getByRole("button", { name: "Continue to casting" }));
-  await screen.findByRole("radio", { name: /Narrator/ });
-  fireEvent.click(screen.getByRole("button", { name: "Continue to synthesis" }));
-  fireEvent.click(screen.getByRole("button", { name: "Continue to output" }));
-  fireEvent.click(screen.getByRole("button", { name: "Review job" }));
-  await screen.findByText("Book conversion: 1000 credits ($10.00). Available: 999 credits.");
-  expect(screen.getByRole("alert")).toHaveTextContent("You do not have enough credits for this book conversion.");
-  expect(screen.getByRole("button", { name: "Start job" })).toBeDisabled();
-  expect(pricedClient.createJob).not.toHaveBeenCalled();
+  expect(changeDraft(d, { step: 2 }).key).toBe("same");
+  expect(changeDraft(d, { title: "New" }).key).not.toBe("same");
+  expect(requestFor(d).casting).toEqual({ voiceId: "v" });
+  localStorage.setItem("broken", "{}");
+  expect(readLibrary("broken")).toEqual({ drafts: [], records: [] });
 });

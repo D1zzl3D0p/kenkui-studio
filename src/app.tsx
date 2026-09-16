@@ -2,40 +2,100 @@ import { useEffect, useState } from "react";
 import type { Capabilities } from "./api/generated/v1";
 import { KenkuiServerClient } from "./api/client";
 import { ErrorMessage } from "./components/error-message";
-import { BillingPage } from "./pages/billing";
-import { JobPage } from "./pages/job";
-import { JobsPage } from "./pages/jobs";
-import { NewJobPage } from "./pages/new-job";
 import { ServersPage } from "./pages/servers";
 import { SignInPage } from "./pages/sign-in";
-import { parseRoute } from "./router";
-import type { Host } from "./host/index";
+import type { Host } from "./host";
 import { isSupportedApiVersion } from "./host/version";
-
-interface AppProps { client: KenkuiServerClient; host: Host; initialPath?: string }
-
-export function App({ client, host, initialPath }: AppProps) {
-  const [path, setPath] = useState(initialPath ?? window.location.pathname);
-  const [capabilities, setCapabilities] = useState<Capabilities>();
-  const [error, setError] = useState<unknown>();
-  useEffect(() => { void client.capabilities().then(setCapabilities).catch(setError); }, [client]);
-  useEffect(() => { const sync = () => setPath(window.location.pathname); window.addEventListener("popstate", sync); return () => window.removeEventListener("popstate", sync); }, []);
-  const navigate = (next: string) => { if (!initialPath) window.history.pushState({}, "", next); setPath(next); };
-  if (error) return <main><h1>Kenkui Studio</h1><ErrorMessage error={error} />
-    {host.can.chooseServer && <button type="button" onClick={() => navigate("/servers")}>Choose another server</button>}
-  </main>;
-  if (!capabilities) return <main><h1>Kenkui Studio</h1><p>Connecting to server…</p></main>;
-  if (!isSupportedApiVersion(capabilities)) return <main><h1>Kenkui Studio</h1>
-    <p>This version of Kenkui Studio is too old to talk to this server. Update it through your package manager.</p>
-  </main>;
-  const route = parseRoute(path);
-  const creditBilling = capabilities.billing?.mode === "credits";
-  return <><nav aria-label="Main navigation"><a href="/jobs" onClick={(event) => { event.preventDefault(); navigate("/jobs"); }}>Jobs</a><a href="/jobs/new" onClick={(event) => { event.preventDefault(); navigate("/jobs/new"); }}>New job</a>{capabilities.auth?.mode !== "none" && <a href="/sign-in" onClick={(event) => { event.preventDefault(); navigate("/sign-in"); }}>Account</a>}{creditBilling && <a href="/billing" onClick={(event) => { event.preventDefault(); navigate("/billing"); }}>Billing</a>}</nav>
-    {route.page === "new-job" && <NewJobPage client={client} capabilities={capabilities} onCreated={(jobId) => navigate(`/jobs/${encodeURIComponent(jobId)}`)} />}
-    {route.page === "job" && route.jobId && <JobPage client={client} host={host} jobId={route.jobId} />}
-    {route.page === "billing" && <BillingPage client={client} capabilities={capabilities} />}
-    {route.page === "sign-in" && <SignInPage capabilities={capabilities} client={client} />}
-    {route.page === "servers" && host.can.chooseServer && <ServersPage host={host} onSelect={() => navigate("/jobs")} />}
-    {route.page === "jobs" && <JobsPage client={client} onOpen={(jobId) => navigate(`/jobs/${encodeURIComponent(jobId)}`)} onCreate={() => navigate("/jobs/new")} />}
-  </>;
+import { Studio } from "./studio/studio";
+import "./studio/style.css";
+export function App({
+  client,
+  host,
+  initialPath,
+}: {
+  client: KenkuiServerClient;
+  host: Host;
+  initialPath?: string;
+}) {
+  const [cap, setCap] = useState<Capabilities>(),
+    [identity, setIdentity] = useState<string>(),
+    [error, setError] = useState<unknown>();
+  const [retry, setRetry] = useState(0),
+    [servers, setServers] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setError(undefined);
+    setCap(undefined);
+    setIdentity(undefined);
+    void client
+      .capabilities()
+      .then(async (value) => {
+        if (!live) return;
+        setCap(value);
+        if (!isSupportedApiVersion(value)) return;
+        const id =
+          value.auth?.mode === "none"
+            ? "local"
+            : (await client.session()).userId;
+        if (live) setIdentity(id);
+      })
+      .catch((cause) => {
+        if (live) setError(cause);
+      });
+    return () => {
+      live = false;
+    };
+  }, [client, retry]);
+  if (servers && host.can.chooseServer)
+    return (
+      <main>
+        <ServersPage host={host} onSelect={() => window.location.reload()} />
+      </main>
+    );
+  if (error)
+    return (
+      <main className="connection-screen">
+        <h1>Kenkui Studio</h1>
+        <ErrorMessage error={error} />
+        {cap?.auth?.mode && cap.auth.mode !== "none" && (
+          <SignInPage capabilities={cap} client={client} />
+        )}
+        <button className="secondary" onClick={() => setRetry((n) => n + 1)}>
+          Try again
+        </button>
+        {host.can.chooseServer && (
+          <button className="text-button" onClick={() => setServers(true)}>
+            Choose another server
+          </button>
+        )}
+      </main>
+    );
+  if (cap && !isSupportedApiVersion(cap))
+    return (
+      <main>
+        <h1>Kenkui Studio</h1>
+        <p>
+          This version of Kenkui Studio is too old to talk to this server.
+          Update it through your package manager.
+        </p>
+      </main>
+    );
+  if (!cap || !identity)
+    return (
+      <main className="connection-screen">
+        <h1>Kenkui Studio</h1>
+        <p role="status">Connecting to your library…</p>
+      </main>
+    );
+  const scope = `${client.storageScope()}::${identity}`;
+  return (
+    <Studio
+      key={scope}
+      client={client}
+      host={host}
+      cap={cap}
+      scope={scope}
+      initialPath={initialPath}
+    />
+  );
 }

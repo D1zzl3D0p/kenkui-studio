@@ -6,12 +6,15 @@ export default defineConfig(({ mode }) => ({
   plugins: [react()],
   resolve: {
     alias: {
-      "@host": resolve(process.cwd(), mode === "native" ? "src/host/tauri.ts" : "src/host/web.ts"),
+      "@host": resolve(
+        process.cwd(),
+        mode === "native" ? "src/host/tauri.ts" : "src/host/web.ts",
+      ),
     },
   },
   server: {
     proxy: {
-      "/v1": "http://127.0.0.1:8000",
+      "/v1": process.env.KENKUI_DEV_API_ORIGIN ?? "http://127.0.0.1:8000",
     },
   },
   test: {

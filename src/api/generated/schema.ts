@@ -44,6 +44,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/assets/{asset_id}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Cover */
+        get: operations["get_cover_v1_assets__asset_id__cover_get"];
+        put?: never;
+        /**
+         * Upload Cover
+         * @description Create a new owned EPUB; never mutate a source used by another draft/job.
+         */
+        post: operations["upload_cover_v1_assets__asset_id__cover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/voices": {
         parameters: {
             query?: never;
@@ -354,6 +375,14 @@ export interface components {
              */
             casting?: components["schemas"]["CastingCapabilities"];
             /**
+             * @default {
+             *       "read": true,
+             *       "upload": true,
+             *       "maxUploadBytes": 8388608
+             *     }
+             */
+            covers?: components["schemas"]["CoverCapabilities"];
+            /**
              * Maxuploadbytes
              * @default 52428800
              */
@@ -421,6 +450,24 @@ export interface components {
             /** Credits */
             credits: number;
         };
+        /** CoverCapabilities */
+        CoverCapabilities: {
+            /**
+             * Read
+             * @default true
+             */
+            read?: boolean;
+            /**
+             * Upload
+             * @default true
+             */
+            upload?: boolean;
+            /**
+             * Maxuploadbytes
+             * @default 8388608
+             */
+            maxUploadBytes?: number;
+        };
         /**
          * ErrorDetail
          * @description Stable client-facing description of a failed request.
@@ -477,6 +524,18 @@ export interface components {
         };
         /** JobResponse */
         JobResponse: {
+            /** Sourcecover */
+            sourceCover?: boolean | null;
+            /** Sourceid */
+            sourceId?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Author */
+            author?: string | null;
+            /** Narratorvoiceid */
+            narratorVoiceId?: string | null;
+            /** Castingmode */
+            castingMode?: string | null;
             /** Failure */
             failure?: {
                 [key: string]: string;
@@ -628,6 +687,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BookResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cover_v1_assets__asset_id__cover_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_cover_v1_assets__asset_id__cover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"];
                 };
             };
             /** @description Validation Error */
