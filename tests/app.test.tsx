@@ -535,3 +535,41 @@ describe("existing Studio feature parity", () => {
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 });
+
+it("returns from billing to a full-cast draft and checks the replenished balance before creation", async () => {
+  const client = makeClient({
+    capabilities: vi.fn().mockResolvedValue({ ...capabilities,
+      billing: { mode: "credits" },
+      casting: { modes: ["single", "characters"], models: ["allowed-model"] },
+    }),
+    preflight: vi.fn().mockResolvedValue({ sourceId: "asset-1", normalizedCharacters: 42,
+      valid: false, estimatedCredits: 150, availableCredits: 0 }),
+    billing: vi.fn().mockResolvedValue({ availableCredits: "0", checkoutEnabled: "true" }),
+    checkout: vi.fn().mockResolvedValue({ url: "https://checkout.stripe.com/test" }),
+  });
+  const host = fakeHost();
+  render(<App client={client as never} host={host} />);
+  await upload();
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Full cast/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  await screen.findByText("You do not have enough credits for this book conversion.");
+  expect(screen.getByRole("button", { name: "Create · 150 credits" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Add credits" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Buy 500 credits — $5 USD" }));
+  await waitFor(() => expect(host.openExternal).toHaveBeenCalledWith("https://checkout.stripe.com/test"));
+  client.preflight.mockResolvedValue({ sourceId: "asset-1", normalizedCharacters: 42,
+    valid: true, estimatedCredits: 150, availableCredits: 500 });
+  client.billing.mockResolvedValue({ availableCredits: "500", checkoutEnabled: "true" });
+  fireEvent.click(screen.getByRole("button", { name: /Back to your book/ }));
+  await screen.findByRole("heading", { name: "Preview & create" });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Create · 150 credits" })).toBeEnabled());
+  const beforeSubmit = client.preflight.mock.calls.length;
+  fireEvent.click(screen.getByRole("button", { name: "Create · 150 credits" }));
+  await waitFor(() => expect(client.createJob).toHaveBeenCalledTimes(1));
+  expect(client.preflight).toHaveBeenCalledTimes(beforeSubmit + 1);
+  expect(client.createJob.mock.calls[0][0].casting).toEqual({
+    narratorVoiceId: "voice-1", unknownVoiceId: "voice-1", modelId: "allowed-model", method: "gendered",
+  });
+  expect(client.upload).toHaveBeenCalledTimes(1);
+});

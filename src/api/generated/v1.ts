@@ -19,4 +19,5 @@ export type ErrorDetail = components["schemas"]["ErrorDetail"];
 export type ErrorResponse = components["schemas"]["ErrorResponse"];
 export type Capabilities = components["schemas"]["Capabilities"];
 export type JobStatus = JobResponse["status"];
-export type BillingResponse = Record<string, string>;
+export type BillingResponse = components["schemas"]["BillingResponse"];
+export type CreditHistoryResponse = components["schemas"]["CreditHistoryResponse"];

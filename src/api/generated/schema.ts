@@ -85,6 +85,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/billing/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Credit History */
+        get: operations["credit_history_v1_billing_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/billing": {
         parameters: {
             query?: never;
@@ -317,6 +334,19 @@ export interface components {
              */
             mode?: "unmetered" | "credits";
         };
+        /** BillingResponse */
+        BillingResponse: {
+            /** Mode */
+            mode: string;
+            /** Availablecredits */
+            availableCredits?: string | null;
+            /** Checkoutenabled */
+            checkoutEnabled?: string | null;
+            /** Packs */
+            packs?: components["schemas"]["CreditPackResponse"][] | null;
+            /** Credithistoryavailable */
+            creditHistoryAvailable?: boolean | null;
+        };
         /** BookResponse */
         BookResponse: {
             /** Sourceid */
@@ -467,6 +497,48 @@ export interface components {
              * @default 8388608
              */
             maxUploadBytes?: number;
+        };
+        /** CreditHistoryResponse */
+        CreditHistoryResponse: {
+            /** Items */
+            items: components["schemas"]["CreditLotResponse"][];
+        };
+        /** CreditLotResponse */
+        CreditLotResponse: {
+            /** Id */
+            id: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "purchase" | "grant" | "legacy";
+            /** Reference */
+            reference: string;
+            /** Credited */
+            credited: number;
+            /** Available */
+            available: number;
+            /** Reserved */
+            reserved: number;
+            /** Consumed */
+            consumed: number;
+            /**
+             * Recordedat
+             * Format: date-time
+             */
+            recordedAt: string;
+            /**
+             * Usagestatus
+             * @enum {string}
+             */
+            usageStatus: "unused" | "reserved" | "used" | "manual_review" | "not_purchased";
+        };
+        /** CreditPackResponse */
+        CreditPackResponse: {
+            /** Credits */
+            credits: number;
+            /** Priceusdcents */
+            priceUsdCents: number;
         };
         /**
          * ErrorDetail
@@ -782,6 +854,26 @@ export interface operations {
             };
         };
     };
+    credit_history_v1_billing_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditHistoryResponse"];
+                };
+            };
+        };
+    };
     billing_v1_billing_get: {
         parameters: {
             query?: never;
@@ -797,9 +889,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["BillingResponse"];
                 };
             };
         };

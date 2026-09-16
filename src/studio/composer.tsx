@@ -189,7 +189,7 @@ export function Composer({
                 : "Updating estimate…"
               : "Complete your choices"}
           {priced && current?.estimatedCredits != null && (
-            <small>${(current.estimatedCredits / 100).toFixed(2)} USD</small>
+            <small>${(current.estimatedCredits / 100).toFixed(2)} USD at the standard credit rate</small>
           )}
         </strong>
       </div>
@@ -232,7 +232,8 @@ export function Composer({
       {priced && (
         <p>
           Updated from the server when your settings change. Credits are
-          reserved only when you start.
+          reserved only when you start. Download completed audio within 30 days.
+          Keep your original EPUB; hosted source files are cleaned up after use.
         </p>
       )}
     </div>

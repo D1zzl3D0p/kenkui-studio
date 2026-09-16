@@ -60,3 +60,58 @@ Core conversion, casting and billing continue to use existing endpoints. New cov
 57 frontend tests and the web build pass after the audit. The browser suite covers real API upload/cover replacement, full-cast request creation in fixture mode, draft recovery, download, mobile themes and audio waveform activity. The server implementation previously passed 138 tests with six environment-dependent skips.
 
 This is source, unit and fixture-browser verification. A packaged native build, live Stripe checkout, provisioned TTS and production PostgreSQL were not exercised. The local review server uses fixture audio.
+
+## Fresh validation pass — September 16, 2026
+
+Compared the current checkout at `05e0594` (including its uncommitted casting,
+API and billing changes) with `feat/warm-studio` at `35461c1` (including its
+existing uncommitted credit-pack/history and UI changes). Those changes were
+preserved. This pass adds regression tests; it does not change application behavior.
+
+- Current checkout: 53 frontend tests pass.
+- Warm Studio: 62 frontend tests pass, including four new tests covering bounded
+  polling after successful checkout, cancellation without polling, credit-history
+  failure/recovery, and the full-cast draft → billing → draft → creation flow.
+- The billing round-trip test verifies checkout through the Host, preserved
+  narrator/model/fallback/method, no duplicate EPUB upload, and a fresh balance
+  check before job creation. Payment confirmation is simulated in this test.
+- Web production build passes. Generated API schema matches the companion
+  `kenkui-server-warm-studio` worktree.
+
+Reproduction from the Warm Studio worktree:
+
+```sh
+npm test
+npm run build:web
+KENKUI_SERVER_ROOT=/home/dizzler/Projects/Worktrees/kenkui-server-warm-studio npm run check:api
+LD_LIBRARY_PATH=/home/dizzler/.cache/kenkui-browser-libs \
+KENKUI_SERVER_ROOT=/home/dizzler/Projects/Worktrees/kenkui-server-warm-studio \
+KENKUI_SERVER_PYTHON=/home/dizzler/Projects/Repos/kenkui-server/.venv/bin/python \
+npm run test:e2e
+```
+
+The explicit server path is necessary in this worktree layout. Chromium initially
+could not launch because the environment lacked `libasound.so.2`; an ARM64 ALSA
+runtime was extracted into the local cache for browser validation without changing
+system packages or repository dependencies.
+
+Remaining operational checks before full parity sign-off:
+
+1. Run against the intended hosted server with authenticated account/session
+   discovery, sign-out/re-login, and account-isolated draft recovery.
+2. Exercise Stripe test-mode checkout success/cancel and webhook-delayed balance
+   updates, including purchased-pack history and conversion reservation/release.
+   Frontend mocks do not prove payment settlement or ledger correctness.
+3. Render actual multi-character text with a provisioned attribution model and TTS;
+   listen for stable character voices, narrator and unknown-speaker fallback, and
+   compare single/full-cast estimates. Browser fixture audio does not prove synthesis.
+4. Verify the deployed API supplies the session endpoint required during startup;
+   the new cover and library metadata features depend on the companion API additions.
+
+No full operational parity claim is made by this test pass. The single-narrator
+initial default remains an intentional difference from the current app's automatic
+character-mode default when supported.
+
+Browser result: both Playwright tests pass against the companion fixture server:
+EPUB/cover upload, draft reload, full-cast creation and M4B download; mobile theme
+switching, voice audition, audio waveform activity and overflow checks.

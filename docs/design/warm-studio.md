@@ -40,9 +40,16 @@ Servers without cover capabilities hide cover controls and use local records whe
 
 ## Remaining product/API decisions
 
-- Source/output retention, remote deletion and cross-device drafts.
+- Hosted output retention is 30 days after completion; source files become eligible
+  for cleanup 24 hours after all dependent jobs terminate (unused uploads after
+  24 hours). Remote deletion and cross-device drafts remain separate decisions.
 - Pre-render character discovery/editing and personalized preview generation/quoting.
-- Marketing pricing: `kenkui-site` still advertises flat 1/3-credit books and $1 per credit. Coordinate that copy with the server before release.
+- Marketing and billing now show owner-confirmed packs of $5/500, $10/1,100 and
+  $20/2,400 credits, before tax. Deploy the companion server catalog first,
+  followed by Studio and the site. Older servers retain standard-rate fallback
+  packs in Studio. The operator is Sumner MacArthur (United States), team@kenkui.fm. Refunds
+  cover fully unused packs requested within 14 days. Policy drafts still require
+  remaining operational details and purchase-level usage accounting before publication.
 
 ## Verification and boundaries
 

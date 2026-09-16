@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Capabilities } from "../api/generated/v1";
+import type { BillingResponse, Capabilities, CreditHistoryResponse } from "../api/generated/v1";
 import type { KenkuiServerClient } from "../api/client";
 import { ErrorMessage } from "../components/error-message";
 export function BillingPage({
@@ -13,10 +13,16 @@ export function BillingPage({
   onBack?(): void;
   onCheckout?(url: string): Promise<void>;
 }) {
-  const [billing, setBilling] = useState<Record<string, string>>(),
+  const [billing, setBilling] = useState<BillingResponse>(),
     [error, setError] = useState<unknown>();
   const [buying, setBuying] = useState(false),
     [refresh, setRefresh] = useState(0);
+  const [history, setHistory] = useState<CreditHistoryResponse>();
+  const [historyError, setHistoryError] = useState(false);
+  useEffect(() => {
+    setHistory(undefined);
+    setHistoryError(false);
+  }, [client]);
   const result = new URLSearchParams(window.location.search).get("checkout");
   useEffect(() => {
     if (capabilities.billing?.mode !== "credits") return;
@@ -28,6 +34,16 @@ export function BillingPage({
           if (active) {
             setBilling(value);
             setError(undefined);
+            if (value.creditHistoryAvailable) {
+              void client.creditHistory().then((result) => {
+                if (active) {
+                  setHistory(result);
+                  setHistoryError(false);
+                }
+              }).catch(() => {
+                if (active) setHistoryError(true);
+              });
+            }
           }
         })
         .catch((cause) => {
@@ -67,6 +83,10 @@ export function BillingPage({
       </section>
     );
   const balance = billing ? Number(billing.availableCredits ?? 0) : undefined;
+  // Older servers offered these standard-rate packs before publishing a catalog.
+  const packs = billing?.packs ?? [500, 1000, 2000].map((credits) => ({
+    credits, priceUsdCents: credits,
+  }));
   return (
     <section className="billing-page">
       {onBack && (
@@ -95,7 +115,7 @@ export function BillingPage({
           </strong>
           {balance != null && (
             <p>
-              Available: {balance} credits (${(balance / 100).toFixed(2)}).
+              Available: {balance} credits. Credits are for rendering, not a cash balance.
             </p>
           )}
         </div>
@@ -108,21 +128,28 @@ export function BillingPage({
       </button>
       <h2>Add credits</h2>
       <p className="muted">
-        100 credits = $1 USD. Pay securely through Stripe.
+        Standard rate: 100 credits per $1 USD. Pack prices and any bonus credits
+        are shown below. Pay securely through Stripe.
       </p>
       {billing?.checkoutEnabled === "true" ? (
         <div className="credit-packs">
-          {[500, 1000, 2000].map((credits) => (
+          {packs.map(({ credits, priceUsdCents }) => (
             <button
               className="credit-pack"
               key={credits}
               disabled={buying}
-              aria-label={`Buy ${credits.toLocaleString("en-US")} credits — $${credits / 100}`}
+              aria-label={`Buy ${credits.toLocaleString("en-US")} credits — $${priceUsdCents / 100} USD`}
               onClick={() => void buy(credits)}
             >
               <strong>{credits.toLocaleString()}</strong>
               <span>credits</span>
-              <b>${credits / 100}</b>
+              <b>${(priceUsdCents / 100).toFixed(2)} USD</b>
+              <span>${(priceUsdCents / credits / 100).toFixed(4)} USD per credit</span>
+              {credits > priceUsdCents && (
+                <span>
+                  {credits - priceUsdCents} bonus credits · {((1 - priceUsdCents / credits) * 100).toFixed(2)}% lower price per credit
+                </span>
+              )}
               <span className="accent">
                 {buying ? "Opening checkout…" : "Continue to checkout →"}
               </span>
@@ -134,7 +161,13 @@ export function BillingPage({
       )}
       <p className="quiet">
         Applicable tax is shown at checkout. Local-currency totals may vary; the
-        credit amount stays the same.
+        credit amount stays the same. Each pack is a one-time purchase, with no
+        subscription or automatic renewal.
+      </p>
+      <p className="quiet">
+        Fully unused packs are refundable on request within 14 days of purchase.
+        Partly used packs are excluded from this voluntary offer; mandatory consumer
+        rights still apply. Contact <a href="mailto:team@kenkui.fm">team@kenkui.fm</a>.
       </p>
       <div className="billing-columns">
         <section>
@@ -167,8 +200,49 @@ export function BillingPage({
           <p className="quiet">
             Check the confirmed price at checkout before purchasing credits.
           </p>
+          <p className="quiet">
+            Download completed audiobooks within 30 days. Uploaded sources become
+            eligible for deletion 24 hours after all their conversions finish;
+            unused uploads become eligible after 24 hours. Keep your original EPUB.
+          </p>
         </section>
       </div>
+      <p className="quiet">
+        <a href="https://kenkui.fm/terms/">Terms & conditions</a>{" · "}
+        <a href="https://kenkui.fm/privacy/">Privacy</a>{" · "}
+        <a href="https://kenkui.fm/refunds/">Refunds & delivery</a>{" · "}
+        <a href="https://kenkui.fm/contact/">Support</a>
+      </p>
+      {billing?.creditHistoryAvailable && (
+        <section aria-label="Credit history">
+          <h2>Credit history</h2>
+          <p className="quiet">
+            Complimentary and legacy credits are used first, then purchased packs
+            from oldest to newest. Reservations hold credits; only a successful
+            conversion marks them used. Failed or cancelled conversions release
+            credits back to the same packs.
+          </p>
+          {historyError ? <p role="status">Could not refresh credit history. Use Refresh balance to try again.</p>
+            : !history ? <p role="status">Loading credit history…</p> : null}
+          {history && history.items.length === 0 && <p>No credit history yet.</p>}
+          <ul className="credit-history">
+            {history?.items.map((lot) => (
+              <li key={lot.id}>
+                <strong>{lot.credited.toLocaleString()} credits · {lot.source === "purchase" ? "Purchased pack" : lot.source === "legacy" ? "Legacy balance" : "Complimentary credits"}</strong>
+                <p>Available: {lot.available.toLocaleString()} · Reserved: {lot.reserved.toLocaleString()} · Used: {lot.consumed.toLocaleString()}</p>
+                <p>{({ unused: "Unused pack", reserved: "Awaiting conversion outcome", used: "Pack has been used", manual_review: "Earlier usage unknown — manual review required", not_purchased: "Not a purchased pack" })[lot.usageStatus]}</p>
+                <p className="quiet">Recorded {new Date(lot.recordedAt).toLocaleString()} · Reference: {lot.reference}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="quiet">
+            Unused status is not a refund approval: the 14-day period is measured
+            from purchase, not the date credits were recorded here. Email
+            {" "}<a href="mailto:team@kenkui.fm">team@kenkui.fm</a> with the pack reference.
+            Legacy balances cannot establish whether an earlier pack was unused.
+          </p>
+        </section>
+      )}
     </section>
   );
 }

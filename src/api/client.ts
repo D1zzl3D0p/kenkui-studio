@@ -72,6 +72,9 @@ export class KenkuiServerClient {
   async billing(): Promise<BillingResponse> {
     return this.json("/v1/billing");
   }
+  async creditHistory(): Promise<import("./generated/v1").CreditHistoryResponse> {
+    return this.json("/v1/billing/history");
+  }
   async checkout(credits: number): Promise<{ url: string }> {
     return this.json("/v1/billing/checkout", this.jsonBody({ credits }));
   }

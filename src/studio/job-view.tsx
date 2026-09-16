@@ -312,6 +312,12 @@ export function JobView({
                     Browser playback loads the audiobook into memory. Download
                     for offline listening.
                   </p>
+                  {capabilities.billing?.mode === "credits" && (
+                    <p className="quiet">
+                      Hosted downloads are retained for 30 days after completion.
+                      Save your M4B before then; Studio is not permanent storage.
+                    </p>
+                  )}
                 </>
               )}
             </>

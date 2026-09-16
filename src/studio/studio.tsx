@@ -148,7 +148,7 @@ export function Studio({
     void client
       .billing()
       .then((value) => {
-        if (live) setBalance(value.availableCredits);
+        if (live) setBalance(value.availableCredits ?? undefined);
       })
       .catch(() => {
         if (live) setBalance(undefined);

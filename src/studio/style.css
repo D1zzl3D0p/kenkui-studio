@@ -2017,3 +2017,7 @@ a {
     top: 20px;
   }
 }
+
+.credit-history { list-style: none; padding: 0; display: grid; gap: 1rem; }
+.credit-history li { padding: 1rem; border: 1px solid currentColor; border-radius: 0.5rem; overflow-wrap: anywhere; }
+.credit-history p { margin-block: 0.5rem; }
