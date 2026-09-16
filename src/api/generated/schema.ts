@@ -331,7 +331,8 @@ export interface components {
              * @default {
              *       "modes": [
              *         "single"
-             *       ]
+             *       ],
+             *       "models": []
              *     }
              */
             casting?: components["schemas"]["CastingCapabilities"];
@@ -357,6 +358,8 @@ export interface components {
              *     ]
              */
             modes?: ("single" | "characters")[];
+            /** Models */
+            models?: string[];
         };
         /**
          * CastingRequest
@@ -540,6 +543,10 @@ export interface components {
             name: string;
             /** Language */
             language: string | null;
+            /** Licenseid */
+            licenseId?: string | null;
+            /** Voicerights */
+            voiceRights?: string | null;
         };
         /** EventResponse */
         EventResponse: {

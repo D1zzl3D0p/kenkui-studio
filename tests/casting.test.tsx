@@ -18,12 +18,33 @@ describe("Casting", () => {
 
   test("a character-capable server offers narrator, unknown, method, and model", () => {
     render(
-      <Casting modes={["single", "characters"]} voices={VOICES} value={{}} onChange={noop} />,
+      <Casting modes={["single", "characters"]} models={["openrouter/test"]} voices={VOICES} value={{}} onChange={noop} />,
     );
     expect(screen.getByLabelText("Narrator")).toBeTruthy();
     expect(screen.getByLabelText("Unknown speaker")).toBeTruthy();
     expect(screen.getByLabelText("Casting method")).toBeTruthy();
     expect(screen.getByLabelText("Attribution model")).toBeTruthy();
+    expect((screen.getByLabelText("Attribution model") as HTMLSelectElement).value).toBe("openrouter/test");
+  });
+
+  test("VCTK voices carry attribution, license, and modification notice", () => {
+    const voices = [
+      {
+        id: "aoife",
+        name: "Aoife",
+        language: "english",
+        licenseId: "CC-BY-4.0",
+        voiceRights: "Derived from VCTK.",
+      },
+    ];
+    render(
+      <Casting modes={["single", "characters"]} models={["model"]} voices={voices} value={{}} onChange={noop} />,
+    );
+    expect(screen.getByText(/CSTR VCTK Corpus/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "CC BY 4.0" }).getAttribute("href")).toBe(
+      "https://creativecommons.org/licenses/by/4.0/",
+    );
+    expect(screen.getByText(/modified by Kyutai and Kenkui/)).toBeTruthy();
   });
 
   test("unknown speaker defaults to following the narrator", () => {
