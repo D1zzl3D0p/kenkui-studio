@@ -205,6 +205,48 @@ describe("real creation flow", () => {
       method: "gendered",
     });
   });
+
+  it("uses the server-advertised model for character casting", async () => {
+    const multiVoiceClient = {
+      ...client,
+      capabilities: vi.fn().mockResolvedValue({
+        apiVersion: "1",
+        auth: { mode: "none" },
+        billing: { mode: "unmetered" },
+        casting: {
+          modes: ["single", "characters"],
+          models: ["openrouter/deepseek/deepseek-v4-flash"],
+        },
+        outputFormats: ["m4b"],
+        sourceFormats: ["epub"],
+      }),
+    };
+    render(<App client={multiVoiceClient as never} host={fakeHost()} initialPath="/jobs/new" />);
+
+    await screen.findByRole("heading", { name: "Source" });
+    fireEvent.change(screen.getByLabelText("EPUB source"), {
+      target: { files: [new File(["epub"], "book.epub")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Inspect source" }));
+    await screen.findByText("Chapter 1");
+    fireEvent.click(screen.getByRole("button", { name: "Continue to casting" }));
+    expect(await screen.findByLabelText("Attribution model")).toHaveValue(
+      "openrouter/deepseek/deepseek-v4-flash",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Continue to synthesis" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to output" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review job" }));
+
+    await waitFor(() => expect(multiVoiceClient.preflight).toHaveBeenCalled());
+    expect(multiVoiceClient.preflight).toHaveBeenCalledWith(
+      expect.objectContaining({
+        casting: expect.objectContaining({
+          modelId: "openrouter/deepseek/deepseek-v4-flash",
+          method: "gendered",
+        }),
+      }),
+    );
+  });
 });
 
 describe("server quotes and billing", () => {
