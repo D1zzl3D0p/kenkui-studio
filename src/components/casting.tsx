@@ -10,6 +10,7 @@ export interface CastingValue {
 
 interface CastingProps {
   modes: string[];
+  models?: string[];
   voices: VoiceResponse[];
   value: CastingValue;
   onChange(value: CastingValue): void;
@@ -28,7 +29,7 @@ const METHODS = [
  * contractually free of jobs and reservations, so there is nothing to list
  * yet. The resolved cast arrives on the job's event stream instead.
  */
-export function Casting({ modes, voices, value, onChange }: CastingProps) {
+export function Casting({ modes, models = [], voices, value, onChange }: CastingProps) {
   if (!modes.includes("characters")) {
     return <p>This server supports one narrator per job.</p>;
   }
@@ -81,13 +82,28 @@ export function Casting({ modes, voices, value, onChange }: CastingProps) {
       </select>
 
       <label htmlFor="model">Attribution model</label>
-      <input
+      <select
         id="model"
-        type="text"
-        value={value.modelId ?? ""}
-        placeholder="model this server allows"
+        value={value.modelId ?? models[0] ?? ""}
         onChange={(event) => set({ modelId: event.target.value })}
-      />
+      >
+        {models.map((model) => (
+          <option key={model} value={model}>{model}</option>
+        ))}
+      </select>
+
+      {voices.some((voice) =>
+        voice.licenseId === "CC-BY-4.0" && voice.voiceRights?.includes("VCTK"),
+      ) && (
+        <p>
+          These voices are derived from the{" "}
+          <a href="https://datashare.ed.ac.uk/handle/10283/3443">CSTR VCTK Corpus</a>,
+          licensed under{" "}
+          <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+          The source recordings were modified by Kyutai and Kenkui into enhanced
+          samples and speaker embeddings.
+        </p>
+      )}
     </fieldset>
   );
 }

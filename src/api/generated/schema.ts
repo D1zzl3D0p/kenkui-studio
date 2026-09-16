@@ -84,6 +84,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/billing/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Checkout */
+        post: operations["checkout_v1_billing_checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jobs/preflight": {
         parameters: {
             query?: never;
@@ -331,7 +348,8 @@ export interface components {
              * @default {
              *       "modes": [
              *         "single"
-             *       ]
+             *       ],
+             *       "models": []
              *     }
              */
             casting?: components["schemas"]["CastingCapabilities"];
@@ -357,6 +375,8 @@ export interface components {
              *     ]
              */
             modes?: ("single" | "characters")[];
+            /** Models */
+            models?: string[];
         };
         /**
          * CastingRequest
@@ -392,6 +412,14 @@ export interface components {
             title: string;
             /** Speechcharacters */
             speechCharacters?: number | null;
+        };
+        /**
+         * CheckoutRequest
+         * @description Only a pack size comes from the browser; account and price are server-owned.
+         */
+        CheckoutRequest: {
+            /** Credits */
+            credits: number;
         };
         /**
          * ErrorDetail
@@ -540,6 +568,10 @@ export interface components {
             name: string;
             /** Language */
             language: string | null;
+            /** Licenseid */
+            licenseId?: string | null;
+            /** Voicerights */
+            voiceRights?: string | null;
         };
         /** EventResponse */
         EventResponse: {
@@ -647,6 +679,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    checkout_v1_billing_checkout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -27,6 +27,9 @@ export class KenkuiServerClient {
 
   async capabilities(): Promise<Capabilities> { return this.json("/v1/capabilities"); }
   async billing(): Promise<BillingResponse> { return this.json("/v1/billing"); }
+  async checkout(credits: number): Promise<{ url: string }> {
+    return this.json("/v1/billing/checkout", this.jsonBody({ credits }));
+  }
   async voices(): Promise<VoiceListResponse> { return this.json("/v1/voices"); }
 
   async upload(file: File): Promise<AssetResponse> {

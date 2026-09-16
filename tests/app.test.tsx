@@ -198,7 +198,7 @@ it("explains an insufficient flat-rate balance at review", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Continue to synthesis" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue to output" }));
   fireEvent.click(screen.getByRole("button", { name: "Review job" }));
-  await screen.findByText("Book conversion: 1000 credits (flat rate). Available: 999 credits.");
+  await screen.findByText("Book conversion: 1000 credits ($10.00). Available: 999 credits.");
   expect(screen.getByRole("alert")).toHaveTextContent("You do not have enough credits for this book conversion.");
   expect(screen.getByRole("button", { name: "Start job" })).toBeDisabled();
   expect(pricedClient.createJob).not.toHaveBeenCalled();
