@@ -2021,3 +2021,25 @@ a {
 .credit-history { list-style: none; padding: 0; display: grid; gap: 1rem; }
 .credit-history li { padding: 1rem; border: 1px solid currentColor; border-radius: 0.5rem; overflow-wrap: anywhere; }
 .credit-history p { margin-block: 0.5rem; }
+
+/* Account actions stay beside the library and balance. */
+.account-menu { position: relative; flex-shrink: 0; }
+.account-trigger { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 50%; }
+.account-trigger[aria-expanded="true"] { background: var(--raised); }
+.account-popover { position: absolute; z-index: 20; top: calc(100% + 12px); right: 0; width: 220px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 32px #0003; }
+.account-popover p { margin: 0 0 12px; }
+.account-popover .primary { display: block; text-align: center; text-decoration: none; }
+.sign-in-panel { max-width: 420px; margin-bottom: 24px; }
+.sign-in-panel .primary { display: inline-block; margin-top: 12px; text-decoration: none; }
+.billing-page .balance-panel { margin-bottom: 28px; gap: 16px; }
+.billing-details { border-top: 1px solid var(--line); padding: 18px 0; }
+.billing-details summary { cursor: pointer; font-weight: 500; color: var(--ink); }
+.billing-details[open] summary { margin-bottom: 18px; }
+.billing-details p { max-width: 70ch; }
+.billing-details + .quiet { margin-top: 28px; font-size: 12px; }
+.billing-details .credit-history li { border-color: var(--line); background: var(--surface); }
+@media (max-width: 480px) {
+  .app-header .brand > span:last-child:not(.brand-mark) { display: none; }
+  .header-actions { gap: 6px; }
+  .billing-page .balance-panel { flex-wrap: wrap; }
+}

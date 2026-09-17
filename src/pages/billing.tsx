@@ -94,13 +94,11 @@ export function BillingPage({
           ← Back to your book
         </button>
       )}
-      <div className="eyebrow">ACCOUNT</div>
-      <h1>Credits & billing</h1>
+      <h1>Credits</h1>
       <ErrorMessage error={error} />
       {result === "success" && (
         <p role="status">
-          Checkout complete. Your balance updates after payment confirmation. We
-          will refresh it for one minute.
+          Checkout complete. Your balance updates after payment confirmation.
         </p>
       )}
       {result === "cancelled" && (
@@ -113,23 +111,14 @@ export function BillingPage({
             {balance == null ? "Loading…" : balance.toLocaleString()}{" "}
             <span>credits</span>
           </strong>
-          {balance != null && (
-            <p>
-              Available: {balance} credits. Credits are for rendering, not a cash balance.
-            </p>
-          )}
         </div>
-        <span className="balance-art" aria-hidden="true">
-          ◈
-        </span>
+        <button className="text-button" onClick={() => setRefresh((n) => n + 1)}>
+          Refresh balance
+        </button>
       </div>
-      <button className="text-button" onClick={() => setRefresh((n) => n + 1)}>
-        Refresh balance
-      </button>
       <h2>Add credits</h2>
       <p className="muted">
-        Standard rate: 100 credits per $1 USD. Pack prices and any bonus credits
-        are shown below. Pay securely through Stripe.
+        One-time top-ups. No subscription.
       </p>
       {billing?.checkoutEnabled === "true" ? (
         <div className="credit-packs">
@@ -144,14 +133,13 @@ export function BillingPage({
               <strong>{credits.toLocaleString()}</strong>
               <span>credits</span>
               <b>${(priceUsdCents / 100).toFixed(2)} USD</b>
-              <span>${(priceUsdCents / credits / 100).toFixed(4)} USD per credit</span>
               {credits > priceUsdCents && (
                 <span>
-                  {credits - priceUsdCents} bonus credits · {((1 - priceUsdCents / credits) * 100).toFixed(2)}% lower price per credit
+                  {(credits - priceUsdCents).toLocaleString()} bonus credits
                 </span>
               )}
               <span className="accent">
-                {buying ? "Opening checkout…" : "Continue to checkout →"}
+                {buying ? "Opening checkout…" : "Buy credits →"}
               </span>
             </button>
           ))}
@@ -159,6 +147,15 @@ export function BillingPage({
       ) : (
         billing && <p>Card payments are not available yet.</p>
       )}
+      <p className="quiet">Secure checkout with Stripe. Tax calculated at checkout.</p>
+      <details className="billing-details">
+        <summary>Pricing & refunds</summary>
+        <p className="quiet">Standard rate: 100 credits per $1 USD. Credits pay for book conversion and are not a cash balance.</p>
+        <ul className="pricing-rules">
+          {packs.map(({ credits, priceUsdCents }) => (
+            <li key={credits}>{credits.toLocaleString()} credits: ${(priceUsdCents / credits / 100).toFixed(4)} USD per credit{credits > priceUsdCents && ` · ${((1 - priceUsdCents / credits) * 100).toFixed(2)}% lower than the standard rate`}</li>
+          ))}
+        </ul>
       <p className="quiet">
         Applicable tax is shown at checkout. Local-currency totals may vary; the
         credit amount stays the same. Each pack is a one-time purchase, with no
@@ -169,9 +166,9 @@ export function BillingPage({
         Partly used packs are excluded from this voluntary offer; mandatory consumer
         rights still apply. Contact <a href="mailto:team@kenkui.fm">team@kenkui.fm</a>.
       </p>
-      <div className="billing-columns">
-        <section>
-          <h2>How credits work</h2>
+      </details>
+      <details className="billing-details">
+          <summary>How credits work</summary>
           <ul className="pricing-rules">
             <li>
               The selected speech text and narration settings determine the
@@ -190,9 +187,7 @@ export function BillingPage({
               conversions release the reservation.
             </li>
           </ul>
-        </section>
-        <section>
-          <h2>Before you create</h2>
+          <h3>Before you create</h3>
           <p className="muted">
             Your book’s estimate updates when settings change. The final price
             and available balance are checked again before starting.
@@ -205,17 +200,10 @@ export function BillingPage({
             eligible for deletion 24 hours after all their conversions finish;
             unused uploads become eligible after 24 hours. Keep your original EPUB.
           </p>
-        </section>
-      </div>
-      <p className="quiet">
-        <a href="https://kenkui.fm/terms/">Terms & conditions</a>{" · "}
-        <a href="https://kenkui.fm/privacy/">Privacy</a>{" · "}
-        <a href="https://kenkui.fm/refunds/">Refunds & delivery</a>{" · "}
-        <a href="https://kenkui.fm/contact/">Support</a>
-      </p>
+      </details>
       {billing?.creditHistoryAvailable && (
-        <section aria-label="Credit history">
-          <h2>Credit history</h2>
+        <details className="billing-details">
+          <summary>Credit history</summary>
           <p className="quiet">
             Complimentary and legacy credits are used first, then purchased packs
             from oldest to newest. Reservations hold credits; only a successful
@@ -241,8 +229,14 @@ export function BillingPage({
             {" "}<a href="mailto:team@kenkui.fm">team@kenkui.fm</a> with the pack reference.
             Legacy balances cannot establish whether an earlier pack was unused.
           </p>
-        </section>
+        </details>
       )}
+      <p className="quiet">
+        <a href="https://kenkui.fm/terms/">Terms & conditions</a>{" · "}
+        <a href="https://kenkui.fm/privacy/">Privacy</a>{" · "}
+        <a href="https://kenkui.fm/refunds/">Refunds & delivery</a>{" · "}
+        <a href="https://kenkui.fm/contact/">Support</a>
+      </p>
     </section>
   );
 }

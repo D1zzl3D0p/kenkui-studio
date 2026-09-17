@@ -3,6 +3,7 @@ import type { Capabilities } from "./api/generated/v1";
 import { KenkuiServerClient } from "./api/client";
 import { ErrorMessage } from "./components/error-message";
 import { ServersPage } from "./pages/servers";
+import { AccountMenu } from "./components/account-menu";
 import { SignInPage } from "./pages/sign-in";
 import type { Host } from "./host";
 import { isSupportedApiVersion } from "./host/version";
@@ -22,6 +23,13 @@ export function App({
     [error, setError] = useState<unknown>();
   const [retry, setRetry] = useState(0),
     [servers, setServers] = useState(false);
+  useEffect(() => {
+    try {
+      document.documentElement.dataset.theme = localStorage.getItem("kenkui-studio-theme") || "system";
+    } catch {
+      document.documentElement.dataset.theme = "system";
+    }
+  }, []);
   useEffect(() => {
     let live = true;
     setError(undefined);
@@ -54,8 +62,12 @@ export function App({
     );
   if (error)
     return (
+      <>
+      <header className="app-header">
+        <a className="brand" href="/">Kenkui <span>Studio</span></a>
+        {cap?.auth?.mode && cap.auth.mode !== "none" && <AccountMenu client={client} signedIn={false} />}
+      </header>
       <main className="connection-screen">
-        <h1>Kenkui Studio</h1>
         <ErrorMessage error={error} />
         {cap?.auth?.mode && cap.auth.mode !== "none" && (
           <SignInPage capabilities={cap} client={client} />
@@ -69,6 +81,7 @@ export function App({
           </button>
         )}
       </main>
+      </>
     );
   if (cap && !isSupportedApiVersion(cap))
     return (

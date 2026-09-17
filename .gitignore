@@ -12,3 +12,4 @@ src-tauri/gen/
 # Local agent caches and separately managed worktrees.
 /.claude/
 /.serena/
+.env.local

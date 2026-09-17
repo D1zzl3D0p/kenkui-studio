@@ -13,7 +13,7 @@ it("offers dollar-priced packs and recovers from checkout failure", async () => 
   };
   render(<BillingPage client={client as unknown as KenkuiServerClient} capabilities={capabilities} />);
   const buy = await screen.findByRole("button", { name: "Buy 500 credits — $5 USD" });
-  expect(screen.getByText(/Available: 300 credits/)).toBeInTheDocument();
+  expect(screen.getByText("300")).toBeInTheDocument();
   fireEvent.click(buy);
   await waitFor(() => expect(client.checkout).toHaveBeenCalledWith(500));
   await waitFor(() => expect(buy).toBeEnabled());
@@ -29,8 +29,9 @@ it("uses the server pack price independently of the number of credits", async ()
   const onCheckout = vi.fn().mockResolvedValue(undefined);
   render(<BillingPage client={client as unknown as KenkuiServerClient} capabilities={capabilities} onCheckout={onCheckout} />);
   const buy = await screen.findByRole("button", { name: "Buy 1,100 credits — $10 USD" });
-  expect(screen.getByText(/100 bonus credits · 9.09%/)).toBeInTheDocument();
-  expect(screen.getByText("$0.0091 USD per credit")).toBeInTheDocument();
+  expect(screen.getByText("100 bonus credits")).toBeInTheDocument();
+  fireEvent.click(screen.getByText("Pricing & refunds"));
+  expect(screen.getByText(/\$0.0091 USD per credit/)).toBeInTheDocument();
   fireEvent.click(buy);
   await waitFor(() => expect(client.checkout).toHaveBeenCalledWith(1100));
   await waitFor(() => expect(onCheckout).toHaveBeenCalledWith("https://checkout.stripe.com/test"));
@@ -53,7 +54,7 @@ it("refreshes a successful checkout for at most one minute", async () => {
     expect(screen.getByText(/Checkout complete/)).toBeInTheDocument();
     client.billing.mockResolvedValue({ availableCredits: "1000", checkoutEnabled: "false" });
     await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
-    expect(screen.getByText(/Available: 1000 credits/)).toBeInTheDocument();
+    expect(screen.getByText("1,000")).toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(57000); });
     const calls = client.billing.mock.calls.length;
     expect(calls).toBeGreaterThan(1);
@@ -74,7 +75,7 @@ it("shows cancelled checkout without polling or adding credits", async () => {
   try {
     await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
     expect(screen.getByText(/Checkout cancelled/)).toBeInTheDocument();
-    expect(screen.getByText(/Available: 300 credits/)).toBeInTheDocument();
+    expect(screen.getByText("300")).toBeInTheDocument();
     expect(client.billing).toHaveBeenCalledTimes(1);
   } finally {
     view.unmount();
@@ -93,7 +94,7 @@ it("recovers credit history independently of the available balance", async () =>
   };
   render(<BillingPage client={client as never} capabilities={capabilities} />);
   await screen.findByText(/Could not refresh credit history/);
-  expect(screen.getByText(/Available: 300 credits/)).toBeInTheDocument();
+  expect(screen.getByText("300")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Buy 500 credits — $5 USD" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Refresh balance" }));
   await screen.findByText("500 credits · Purchased pack");
@@ -130,4 +131,17 @@ it("keeps billing usable when purchase history fails and can retry", async () =>
   fireEvent.click(screen.getByRole("button", { name: "Refresh balance" }));
   expect(await screen.findByText("No credit history yet.")).toBeInTheDocument();
   expect(screen.queryByText(/Could not refresh credit history/)).not.toBeInTheDocument();
+});
+
+it("keeps billing details collapsed until requested", async () => {
+  const client = { billing: vi.fn().mockResolvedValue({ availableCredits: "300", checkoutEnabled: "true", creditHistoryAvailable: true }),
+    creditHistory: vi.fn().mockResolvedValue({ items: [] }) };
+  render(<BillingPage client={client as never} capabilities={capabilities} />);
+  expect(await screen.findByRole("button", { name: "Buy 500 credits — $5 USD" })).toBeVisible();
+  for (const label of ["Pricing & refunds", "How credits work", "Credit history"]) {
+    const summary = screen.getByText(label);
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+    fireEvent.click(summary);
+    expect(summary.closest("details")).toHaveAttribute("open");
+  }
 });

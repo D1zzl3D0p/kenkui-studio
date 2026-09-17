@@ -577,6 +577,40 @@ it("returns from billing to a full-cast draft and checks the replenished balance
   expect(client.upload).toHaveBeenCalledTimes(1);
 });
 
+it("moves signed-in account actions into the header and dismisses them with Escape", async () => {
+  const client = makeClient({
+    capabilities: vi.fn().mockResolvedValue({ ...capabilities, auth: { mode: "session" } }),
+    session: vi.fn().mockResolvedValue({ userId: "reader" }),
+    authUrl: (action: string) => `/v1/auth/${action}`,
+  });
+  render(<App client={client as never} host={fakeHost()} initialPath="/sign-in" />);
+  const account = await screen.findByRole("button", { name: "Account" });
+  expect(account.closest("header")).not.toBeNull();
+  expect(await screen.findByRole("heading", { name: "New audiobook" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Sign out" }).closest("form")).toHaveAttribute("method", "post");
+  expect(screen.getByRole("button", { name: "Sign out" }).closest("form")).toHaveAttribute("action", "/v1/auth/logout");
+  expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(account).toHaveAttribute("aria-expanded", "false");
+  expect(account).toHaveFocus();
+  fireEvent.click(account);
+  expect(screen.getByRole("button", { name: "Sign out" })).toBeVisible();
+  fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+});
+
+it("offers only sign-in actions when the session is unavailable", async () => {
+  const client = makeClient({
+    capabilities: vi.fn().mockResolvedValue({ ...capabilities, auth: { mode: "session" } }),
+    session: vi.fn().mockRejectedValue(new Error("Session expired")),
+    authUrl: (action: string) => `/v1/auth/${action}`,
+  });
+  render(<App client={client as never} host={fakeHost()} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Account" }));
+  expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(2);
+  expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+});
+
 
 describe("pacing and speech preparation", () => {
   it("persists defaults and overrides and submits the same settings it estimates", async () => {

@@ -8,7 +8,7 @@ import type {
 import type { Host } from "../host";
 import { ErrorMessage } from "../components/error-message";
 import { BillingPage } from "../pages/billing";
-import { SignInPage } from "../pages/sign-in";
+import { AccountMenu } from "../components/account-menu";
 import { ServersPage } from "../pages/servers";
 import { Composer } from "./composer";
 import { BookCover } from "./cover";
@@ -292,7 +292,7 @@ export function Studio({
         }
       : undefined;
   const isHome =
-    !draftId && !jobId && !["/billing", "/sign-in", "/servers"].includes(path);
+    !draftId && !jobId && !["/billing", "/servers"].includes(path);
   return (
     <>
       <header className="app-header">
@@ -332,6 +332,9 @@ export function Studio({
               <option value="light">☼ Light</option>
             </select>
           </label>
+          {cap.auth?.mode && cap.auth.mode !== "none" && (
+            <AccountMenu client={client} signedIn initiallyOpen={path === "/sign-in"} />
+          )}
         </nav>
       </header>
       <main>
@@ -344,8 +347,7 @@ export function Studio({
             onBack={backFromBilling}
             onCheckout={(url) => host.openExternal(url)}
           />
-        ) : path === "/sign-in" ? (
-          <SignInPage capabilities={cap} client={client} />
+
         ) : path === "/servers" && host.can.chooseServer ? (
           <ServersPage host={host} onSelect={() => window.location.reload()} />
         ) : draftId ? (
@@ -530,14 +532,7 @@ export function Studio({
               Server
             </button>
           )}
-          {cap.auth?.mode !== "none" && (
-            <button
-              className="text-button"
-              onClick={() => navigate("/sign-in")}
-            >
-              Account
-            </button>
-          )}
+
         </div>
       </footer>
       <dialog
