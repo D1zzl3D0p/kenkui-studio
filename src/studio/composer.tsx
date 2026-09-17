@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KenkuiServerClient } from "../api/client";
 import type {
   Capabilities,
@@ -43,6 +43,13 @@ export function Composer({
     [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState("");
   const pending = useRef(false);
+  const editor = useRef<HTMLElement>(null);
+  const expanded = useRef<Record<string, boolean>>({});
+  useLayoutEffect(() => {
+    editor.current?.querySelectorAll<HTMLDetailsElement>("details[data-settings-id]").forEach((details) => {
+      details.open = expanded.current[details.dataset.settingsId!] ?? false;
+    });
+  }, [d.step]);
   useEffect(() => {
     if (!d.narrator && voices[0]) update({ narrator: voices[0].id });
   }, [d.narrator, voices]);
@@ -104,9 +111,11 @@ export function Composer({
   const name = (id: string) =>
     voices.find((v) => v.id === id)?.name || "Choose a voice";
   const step = (value: number) => {
+    editor.current?.querySelectorAll<HTMLDetailsElement>("details[data-settings-id]").forEach((details) => {
+      expanded.current[details.dataset.settingsId!] = details.open;
+    });
     update({ step: value });
     setNotice("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
   async function submit() {
     if (!eligible || pending.current) return;
@@ -283,7 +292,7 @@ export function Composer({
             </span>
           </div>
         </aside>
-        <section className="editor" key={d.step}>
+        <section ref={editor} className="editor step-panel" key={d.step}>
           <ErrorMessage error={error} />
           {notice && <p role="status">{notice}</p>}
           <fieldset disabled={busy} className="editor-controls">
@@ -340,7 +349,7 @@ export function Composer({
                     )}
                   </div>
                 )}
-                <details>
+                <details data-settings-id="book">
                   <summary>Advanced</summary>
                   <div className="settings-grid">
                     <label className="checkbox">
@@ -515,7 +524,7 @@ export function Composer({
                   </p>
                 )}
                 {d.mode === "characters" && (
-                  <details>
+                  <details data-settings-id="casting">
                     <summary>Advanced</summary>
                     <div className="settings-grid">
                       <label>
@@ -626,7 +635,7 @@ export function Composer({
                   <p role="status">This server cannot apply the saved pacing and speech preparation settings.</p>
                 )}
                 {(cap.outputFormats?.length ?? 0) > 1 && (
-                  <details>
+                  <details data-settings-id="output">
                     <summary>Advanced</summary>
                     <label>
                       Audio format

@@ -135,3 +135,18 @@ it("reports disconnection when recovery is exhausted", async () => {
     stream.close();
   } finally { vi.useRealTimers(); }
 });
+
+
+it("announces authentication failures across JSON and binary requests and unsubscribes", async () => {
+  const fetcher = vi.fn(async () => new Response(JSON.stringify({ error: { message: "Expired" } }), { status: 401 }));
+  const client = new KenkuiServerClient("", { fetch: fetcher });
+  const expired = vi.fn();
+  const unsubscribe = client.onUnauthorized(expired);
+  await expect(client.billing()).rejects.toMatchObject({ status: 401 });
+  await expect(client.cover("asset")).rejects.toMatchObject({ status: 401 });
+  await expect(client.artifact("job")).rejects.toMatchObject({ status: 401 });
+  expect(expired).toHaveBeenCalledTimes(3);
+  unsubscribe();
+  await expect(client.session()).rejects.toMatchObject({ status: 401 });
+  expect(expired).toHaveBeenCalledTimes(3);
+});

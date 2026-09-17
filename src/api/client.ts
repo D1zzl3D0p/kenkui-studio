@@ -40,6 +40,18 @@ export class KenkuiServerClient {
     this.getJobOverride = dependencies.getJob;
   }
 
+  private readonly unauthorized = new Set<() => void>();
+
+  onUnauthorized(listener: () => void): () => void {
+    this.unauthorized.add(listener);
+    return () => { this.unauthorized.delete(listener); };
+  }
+
+  private async responseError(response: Response) {
+    if (response.status === 401) this.unauthorized.forEach((listener) => listener());
+    return asApiError(response);
+  }
+
   storageScope(): string {
     return this.baseUrl || "same-origin";
   }
@@ -51,7 +63,7 @@ export class KenkuiServerClient {
       this.url(`/v1/assets/${encodeURIComponent(assetId)}/cover`),
       { credentials: "include" },
     );
-    if (!response.ok) throw await asApiError(response);
+    if (!response.ok) throw await this.responseError(response);
     return response.blob();
   }
   async uploadCover(assetId: string, file: File): Promise<AssetResponse> {
@@ -137,7 +149,7 @@ export class KenkuiServerClient {
       this.url(`/v1/jobs/${encodeURIComponent(jobId)}/artifact`),
       { credentials: "include" },
     );
-    if (!response.ok) throw await asApiError(response);
+    if (!response.ok) throw await this.responseError(response);
     return response.blob();
   }
 
@@ -173,7 +185,7 @@ export class KenkuiServerClient {
       credentials: "include",
       ...init,
     });
-    if (!response.ok) throw await asApiError(response);
+    if (!response.ok) throw await this.responseError(response);
     return response.json() as Promise<T>;
   }
   private url(path: string): string {

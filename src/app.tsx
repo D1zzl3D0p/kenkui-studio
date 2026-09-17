@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Capabilities } from "./api/generated/v1";
 import { KenkuiServerClient } from "./api/client";
+import { KenkuiApiError } from "./api/errors";
 import { ErrorMessage } from "./components/error-message";
 import { ServersPage } from "./pages/servers";
 import { AccountMenu } from "./components/account-menu";
@@ -23,6 +24,31 @@ export function App({
     [error, setError] = useState<unknown>();
   const [retry, setRetry] = useState(0),
     [servers, setServers] = useState(false);
+  useEffect(() => {
+    if ((initialPath || window.location.pathname) === "/sign-in") {
+      window.location.replace(client.authUrl("login"));
+    }
+  }, [client, initialPath]);
+  useEffect(() => {
+    if (!cap?.auth?.mode || cap.auth.mode === "none") return;
+    const signedOut = () => {
+      setIdentity(undefined);
+      setError(new KenkuiApiError(401, "Sign in to your studio"));
+      window.history.replaceState({}, "", "/");
+    };
+    const unsubscribe = client.onUnauthorized?.(signedOut);
+    const resume = host.onResume(() => {
+      void client.session().catch((cause) => {
+        if (cause instanceof KenkuiApiError && cause.status === 401) signedOut();
+      });
+    });
+    return () => { unsubscribe?.(); resume(); };
+  }, [client, host, cap]);
+  useEffect(() => {
+    if (error instanceof KenkuiApiError && error.status === 401) {
+      window.history.replaceState({}, "", "/");
+    }
+  }, [error]);
   useEffect(() => {
     try {
       document.documentElement.dataset.theme = localStorage.getItem("kenkui-studio-theme") || "system";
@@ -60,6 +86,13 @@ export function App({
         <ServersPage host={host} onSelect={() => window.location.reload()} />
       </main>
     );
+  if (error instanceof KenkuiApiError && error.status === 401 && cap && cap.auth?.mode !== "none")
+    return <>
+      <header className="app-header"><a className="brand" href="/">Kenkui <span>Studio</span></a></header>
+      <main className="connection-screen">
+        <SignInPage capabilities={cap} client={client} />
+      </main>
+    </>;
   if (error)
     return (
       <>

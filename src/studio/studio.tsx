@@ -49,6 +49,7 @@ export function Studio({
   const [path, setPath] = useState(initialPath || window.location.pathname);
   const [voices, setVoices] = useState<VoiceResponse[]>([]),
     [jobs, setJobs] = useState<JobResponse[]>();
+  const [dragging, setDragging] = useState(false);
   const [balance, setBalance] = useState<string>();
   const [error, setError] = useState<unknown>(),
     [jobsError, setJobsError] = useState<unknown>(),
@@ -402,15 +403,20 @@ export function Studio({
                 </span>
               </div>
               <div
-                className="drop-zone"
-                onDragOver={(e) => e.preventDefault()}
+                className={`drop-zone${dragging ? " dragging" : ""}`}
+                aria-busy={busy}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = busy ? "none" : "copy"; setDragging(!busy); }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); }}
                 onDrop={(e) => {
                   e.preventDefault();
+                  setDragging(false);
                   void upload(e.dataTransfer.files[0]);
                 }}
               >
                 <div className="upload-icon" aria-hidden="true">
-                  ↥
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 16V4m-5 5 5-5 5 5M5 16v4h14v-4" />
+                  </svg>
                 </div>
                 <div>
                   <h2>Add your book</h2>

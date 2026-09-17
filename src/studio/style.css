@@ -2043,3 +2043,27 @@ a {
   .header-actions { gap: 6px; }
   .billing-page .balance-panel { flex-wrap: wrap; }
 }
+
+/* Brief feedback without delaying repeated navigation. */
+.step-panel { animation: step-enter 110ms ease-out; }
+.editor details input:not([type="checkbox"]), .editor details select {
+  padding: 5px 8px;
+  min-height: 32px;
+  margin-top: 4px;
+}
+.editor-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding-block: 12px;
+}
+.drop-zone.dragging { border-color: var(--accent); background: var(--surface); }
+.upload-icon svg { display: block; }
+@keyframes step-enter {
+  from { opacity: .65; transform: translateX(5px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-panel { animation: none; }
+}

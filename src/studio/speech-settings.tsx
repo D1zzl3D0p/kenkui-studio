@@ -20,7 +20,7 @@ export function SpeechControls({ value = legacySpeechSettings, onChange, showCha
   onChange(value: SpeechSettings): void;
 }) {
   return <>
-    {showChapterToggle && <details>
+    {showChapterToggle && <details data-settings-id="chapter-pauses">
       <summary>Pacing · Chapter pauses {value.chapterPauses ? "on" : "off"}</summary>
       <div className="settings-grid">
         <label className="checkbox">
@@ -32,7 +32,7 @@ export function SpeechControls({ value = legacySpeechSettings, onChange, showCha
         <p className="quiet" id="chapter-pauses-description">Adds a 1.5-second gap between chapters, with no extra silence at the end of the book.</p>
       </div>
     </details>}
-    <details>
+    <details data-settings-id="speech">
       <summary>Speech preparation · {preparation.filter(([key]) => value[key]).length} enabled</summary>
       <p className="quiet">These options apply to English narration. Other narrator languages use the original text preparation.</p>
       <div className="settings-grid">
@@ -70,7 +70,7 @@ export function PauseControls({ value, onChange }: {
   onChange(value: PauseLengths): void;
 }) {
   const invalid = pauseFields.some(([key]) => !validPauseLength(value[key]));
-  return <details>
+  return <details data-settings-id="pause-lengths">
     <summary>Pacing · {invalid ? "Check pause lengths" : `${Number(value.chapterPauseMs)} ms between chapters`}</summary>
     <p className="quiet" id="pause-lengths-help">
       Enter whole milliseconds from 0 to 60,000. Use 0 for no added pause.
