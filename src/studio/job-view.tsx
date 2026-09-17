@@ -33,6 +33,9 @@ export function JobView({
   onChanged(): void;
 }) {
   const alive = useRef(true);
+  const downloadController = useRef<AbortController | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<{ received: number; total?: number | null; phase?: "sharing" }>();
+  useEffect(() => () => { downloadController.current?.abort(); }, [id]);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -129,17 +132,24 @@ export function JobView({
   const title = job?.title || record?.title || "Audiobook",
     author = job?.author || record?.author || "";
   async function download() {
+    const controller = new AbortController();
+    downloadController.current = controller;
+    if (host.platform !== "web") setDownloadProgress({ received: 0 });
     setBusy(true);
     setError(undefined);
     try {
       await host.saveArtifact(
         { url: client.artifactUrl(id), load: () => client.artifact(id) },
         `${title.replace(/[\\/:*?"<>|]/g, "_")}.m4b`,
+        { signal: controller.signal, onProgress: (progress) => {
+          if (alive.current && !controller.signal.aborted) setDownloadProgress(progress);
+        } },
       );
     } catch (cause) {
-      setError(cause);
+      if (alive.current && !(cause instanceof DOMException && cause.name === "AbortError")) setError(cause);
     } finally {
-      setBusy(false);
+      downloadController.current = null;
+      if (alive.current) { setBusy(false); setDownloadProgress(undefined); }
     }
   }
   async function listen() {
@@ -284,8 +294,19 @@ export function JobView({
                     disabled={busy}
                     onClick={() => void download()}
                   >
-                    {busy ? "Preparing audio…" : "Download M4B"}
+                    {downloadProgress?.phase === "sharing" ? "Choose where to save or share…" : downloadProgress ? "Downloading…" : busy ? "Preparing audio…" : host.platform === "mobile" ? "Save or share M4B" : "Download M4B"}
                   </button>
+                  {downloadProgress && downloadProgress.phase !== "sharing" && (
+                    <div>
+                      <p role="status">
+                        Downloaded {(downloadProgress.received / 1048576).toFixed(1)} MB
+                        {downloadProgress.total ? ` of ${(downloadProgress.total / 1048576).toFixed(1)} MB` : ""}
+                      </p>
+                      <progress aria-label="Download progress" max={downloadProgress.total || 1}
+                        value={downloadProgress.total ? downloadProgress.received : undefined} />
+                      <button className="text-button" onClick={() => downloadController.current?.abort()}>Cancel download</button>
+                    </div>
+                  )}
                   {audio ? (
                     <audio
                       className="result-player"

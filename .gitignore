@@ -7,7 +7,23 @@ test-results/
 __pycache__/
 .pytest_cache/
 src-tauri/target/
-src-tauri/gen/
+src-tauri/gen/schemas/
+src-tauri/gen/android/.gradle/
+src-tauri/gen/android/.kotlin/
+src-tauri/gen/android/**/build/
+src-tauri/gen/android/local.properties
+src-tauri/gen/android/keystore.properties
+src-tauri/gen/apple/build/
+src-tauri/gen/apple/Externals/
+src-tauri/gen/apple/Pods/
+src-tauri/gen/apple/**/xcuserdata/
+src-tauri/gen/apple/**/*.xcuserstate
+src-tauri/plugins/**/.tauri/
+src-tauri/plugins/**/.build/
+src-tauri/plugins/**/.gradle/
+src-tauri/plugins/**/build/
+*.jks
+*.keystore
 
 # Local agent caches and separately managed worktrees.
 /.claude/

@@ -132,7 +132,14 @@ it("reports disconnection when recovery is exhausted", async () => {
       await vi.runAllTimersAsync();
     }
     expect(onConnection).toHaveBeenLastCalledWith("disconnected");
+    const exhausted = FakeEventSource.last;
+    await stream.onDisconnect();
+    expect(FakeEventSource.last).not.toBe(exhausted);
+    expect(getJob).toHaveBeenCalledTimes(4);
     stream.close();
+    const closed = FakeEventSource.last;
+    await stream.onDisconnect();
+    expect(FakeEventSource.last).toBe(closed);
   } finally { vi.useRealTimers(); }
 });
 
@@ -149,4 +156,18 @@ it("announces authentication failures across JSON and binary requests and unsubs
   unsubscribe();
   await expect(client.session()).rejects.toMatchObject({ status: 401 });
   expect(expired).toHaveBeenCalledTimes(3);
+});
+
+it("replaces stale sockets on resume and ignores events from the old connection", async () => {
+  const getJob = vi.fn().mockResolvedValue({ id: "job-1", status: "running", progress: { stage: "synthesis", completed: 1, total: 9 } });
+  const onEvent = vi.fn();
+  const client = new KenkuiServerClient("", { getJob, eventSource: FakeEventSource });
+  const stream = client.events("job-1", onEvent);
+  const stale = FakeEventSource.last;
+  await Promise.all([stream.onDisconnect(), stream.onDisconnect()]);
+  expect(getJob).toHaveBeenCalledOnce();
+  expect(FakeEventSource.last).not.toBe(stale);
+  stale.emit("progress", { sequence: 99, type: "progress", progress: { stage: "synthesis", completed: 1, total: 9 } });
+  expect(onEvent).not.toHaveBeenCalled();
+  stream.close();
 });

@@ -110,7 +110,7 @@ async function review() {
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   await screen.findByRole("heading", { name: "Narration" });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  await screen.findByRole("heading", { name: "Preview & create" });
+  await screen.findByRole("heading", { name: "Review & create" });
 }
 
 describe("real creation flow", () => {
@@ -321,6 +321,31 @@ describe("server quotes and billing", () => {
 });
 
 describe("job lifecycle and host behavior", () => {
+  it.each(["button", "unmount"])("shows download progress and cancels via %s", async (cancelVia) => {
+    const host = fakeHost();
+    host.can.saveToPath = true;
+    let signal!: AbortSignal;
+    vi.mocked(host.saveArtifact).mockImplementation((_artifact, _name, options) => new Promise((_resolve, reject) => {
+      signal = options!.signal!;
+      options!.onProgress!({ received: 1048576, total: 2097152 });
+      signal.addEventListener("abort", () => reject(new DOMException("Cancelled", "AbortError")), { once: true });
+    }));
+    const client = makeClient({
+      getJob: vi.fn().mockResolvedValue({ id: "job-1", status: "succeeded", progress: { stage: "complete", completed: 1, total: 1 } }),
+      artifactUrl: vi.fn().mockReturnValue("/v1/jobs/job-1/artifact"),
+    });
+    const view = render(<App client={client as never} host={host} initialPath="/jobs/job-1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Download M4B" }));
+    expect(await screen.findByText("Downloaded 1.0 MB of 2.0 MB")).toBeVisible();
+    expect(screen.getByRole("progressbar", { name: "Download progress" })).toHaveAttribute("value", "1048576");
+    if (cancelVia === "unmount") view.unmount();
+    else fireEvent.click(screen.getByRole("button", { name: "Cancel download" }));
+    expect(signal.aborted).toBe(true);
+    if (cancelVia === "button") {
+      await waitFor(() => expect(screen.getByRole("button", { name: "Download M4B" })).toBeEnabled());
+      expect(screen.queryByRole("alert")).toBeNull();
+    }
+  });
   it("keeps cancellation pending and enables real host download only at completion", async () => {
     let emit: (event: any) => void = () => {};
     const host = fakeHost();
@@ -359,6 +384,7 @@ describe("job lifecycle and host behavior", () => {
       expect(host.saveArtifact).toHaveBeenCalledWith(
         { url: "/v1/jobs/job-1/artifact", load: expect.any(Function) },
         "Audiobook.m4b",
+        expect.objectContaining({ signal: expect.any(AbortSignal), onProgress: expect.any(Function) }),
       ),
     );
     expect(client.artifact).not.toHaveBeenCalled();
@@ -565,7 +591,7 @@ it("returns from billing to a full-cast draft and checks the replenished balance
     valid: true, estimatedCredits: 150, availableCredits: 500 });
   client.billing.mockResolvedValue({ availableCredits: "500", checkoutEnabled: "true" });
   fireEvent.click(screen.getByRole("button", { name: /Back to your book/ }));
-  await screen.findByRole("heading", { name: "Preview & create" });
+  await screen.findByRole("heading", { name: "Review & create" });
   await waitFor(() => expect(screen.getByRole("button", { name: "Create · 150 credits" })).toBeEnabled());
   const beforeSubmit = client.preflight.mock.calls.length;
   fireEvent.click(screen.getByRole("button", { name: "Create · 150 credits" }));

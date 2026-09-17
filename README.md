@@ -1,7 +1,12 @@
-# Kenkui web
+# Kenkui Studio
 
 Browser client for the sibling `kenkui-server` API. All ebook processing runs
 through the server and the Kenkui library.
+
+The same frontend also has a Tauri desktop shell and mobile integration in progress. Native support is under
+development; see [native setup](docs/setup/native-development.md),
+[mobile setup](docs/setup/mobile-development.md), and the
+[readiness backlog](docs/tauri-readiness.md).
 
 ```sh
 npm ci

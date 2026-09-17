@@ -334,7 +334,7 @@ export function Studio({
             </select>
           </label>
           {cap.auth?.mode && cap.auth.mode !== "none" && (
-            <AccountMenu client={client} signedIn initiallyOpen={path === "/sign-in"} />
+            <AccountMenu client={client} signedIn auth={host.auth} initiallyOpen={path === "/sign-in"} />
           )}
         </nav>
       </header>

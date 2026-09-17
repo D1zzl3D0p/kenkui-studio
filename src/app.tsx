@@ -25,10 +25,11 @@ export function App({
   const [retry, setRetry] = useState(0),
     [servers, setServers] = useState(false);
   useEffect(() => {
-    if ((initialPath || window.location.pathname) === "/sign-in") {
+    if (!host.auth && (initialPath || window.location.pathname) === "/sign-in") {
       window.location.replace(client.authUrl("login"));
     }
-  }, [client, initialPath]);
+  }, [client, host.auth, initialPath]);
+  useEffect(() => host.auth?.onChanged(() => setRetry((value) => value + 1)), [host.auth]);
   useEffect(() => {
     if (!cap?.auth?.mode || cap.auth.mode === "none") return;
     const signedOut = () => {
@@ -67,6 +68,7 @@ export function App({
         if (!live) return;
         setCap(value);
         if (!isSupportedApiVersion(value)) return;
+        if (value.auth?.mode !== "none") await host.auth?.restore(client.storageScope());
         const id =
           value.auth?.mode === "none"
             ? "local"
@@ -79,7 +81,7 @@ export function App({
     return () => {
       live = false;
     };
-  }, [client, retry]);
+  }, [client, host, retry]);
   if (servers && host.can.chooseServer)
     return (
       <main>
@@ -90,7 +92,8 @@ export function App({
     return <>
       <header className="app-header"><a className="brand" href="/">Kenkui <span>Studio</span></a></header>
       <main className="connection-screen">
-        <SignInPage capabilities={cap} client={client} />
+        <SignInPage capabilities={cap} client={client} auth={host.auth} />
+        {host.can.chooseServer && <button className="text-button" onClick={() => setServers(true)}>Choose another server</button>}
       </main>
     </>;
   if (error)
@@ -98,12 +101,12 @@ export function App({
       <>
       <header className="app-header">
         <a className="brand" href="/">Kenkui <span>Studio</span></a>
-        {cap?.auth?.mode && cap.auth.mode !== "none" && <AccountMenu client={client} signedIn={false} />}
+        {cap?.auth?.mode && cap.auth.mode !== "none" && <AccountMenu client={client} signedIn={false} auth={host.auth} />}
       </header>
       <main className="connection-screen">
         <ErrorMessage error={error} />
         {cap?.auth?.mode && cap.auth.mode !== "none" && (
-          <SignInPage capabilities={cap} client={client} />
+          <SignInPage capabilities={cap} client={client} auth={host.auth} />
         )}
         <button className="secondary" onClick={() => setRetry((n) => n + 1)}>
           Try again

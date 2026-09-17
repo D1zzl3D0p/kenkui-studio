@@ -51,6 +51,7 @@
 }
 body {
   margin: 0;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 button,
 input,
@@ -2066,4 +2067,9 @@ a {
 }
 @media (prefers-reduced-motion: reduce) {
   .step-panel { animation: none; }
+}
+
+/* Keep native form controls readable without iOS focus zoom. */
+@media (pointer: coarse) {
+  input, textarea, select { font-size: max(16px, 1em); }
 }

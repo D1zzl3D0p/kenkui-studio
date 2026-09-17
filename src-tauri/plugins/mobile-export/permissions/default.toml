@@ -1,0 +1,3 @@
+[default]
+description = "No JavaScript commands. Export is initiated and scoped by Rust."
+permissions = []

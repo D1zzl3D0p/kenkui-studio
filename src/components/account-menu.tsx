@@ -1,10 +1,13 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { KenkuiServerClient } from "../api/client";
+import type { Host } from "../host";
+import { NativeAuthAction } from "./native-auth-action";
 
-export function AccountMenu({ client, signedIn, initiallyOpen = false }: {
+export function AccountMenu({ client, signedIn, initiallyOpen = false, auth }: {
   client: KenkuiServerClient;
   signedIn: boolean;
   initiallyOpen?: boolean;
+  auth?: Host["auth"];
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const root = useRef<HTMLDivElement>(null);
@@ -40,7 +43,7 @@ export function AccountMenu({ client, signedIn, initiallyOpen = false }: {
     </button>
     {open && <div id={id} className="account-popover">
       <p className="quiet">{signedIn ? "Signed in" : "Your account"}</p>
-      {signedIn
+      {auth ? <NativeAuthAction auth={auth} origin={client.storageScope()} action={signedIn ? "signOut" : "signIn"} /> : signedIn
         ? <form method="post" action={client.authUrl("logout")}><button className="secondary full" type="submit">Sign out</button></form>
         : <a className="primary" href={client.authUrl("login")}>Sign in</a>}
     </div>}

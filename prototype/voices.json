@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Beatrix",
+    "accent": "English",
+    "gender": "Female",
+    "audio": "./audio/beatrix-f-vctk-p233-english.wav"
+  },
+  {
+    "name": "Clara",
+    "accent": "American",
+    "gender": "Female",
+    "audio": "./audio/clara-f-ears-p027-american.wav"
+  },
+  {
+    "name": "Dolly",
+    "accent": "American Tennessee",
+    "gender": "Female",
+    "audio": "./audio/dolly-f-vctk-p310-american-tennessee.wav"
+  },
+  {
+    "name": "Eoin",
+    "accent": "Irish",
+    "gender": "Male",
+    "audio": "./audio/eoin-m-vctk-p364-irish.wav"
+  },
+  {
+    "name": "Jasper",
+    "accent": "American",
+    "gender": "Male",
+    "audio": "./audio/jasper-m-ears-p039-american.wav"
+  },
+  {
+    "name": "Mabel",
+    "accent": "English Yorkshire",
+    "gender": "Female",
+    "audio": "./audio/mabel-f-vctk-p267-english-yorkshire.wav"
+  },
+  {
+    "name": "Marin",
+    "accent": "American California",
+    "gender": "Female",
+    "audio": "./audio/marin-f-vctk-p299-american-california.wav"
+  },
+  {
+    "name": "Sterling",
+    "accent": "British",
+    "gender": "Male",
+    "audio": "./audio/sterling-m-ears-p008-british.wav"
+  }
+]

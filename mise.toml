@@ -1,0 +1,20 @@
+[tools]
+node = "24.21.0"
+java = "temurin-21.0.12+8.0.LTS"
+rust = { version = "1.98.1", profile = "minimal", components = ["rustfmt", "clippy"], targets = ["aarch64-linux-android", "armv7-linux-androideabi", "i686-linux-android", "x86_64-linux-android"] }
+# Version 23 uses an x86-64 native CLI on Linux; 19 keeps the portable Java SDK manager.
+android-sdk = "19.0"
+
+[env]
+NDK_HOME = { value = "{% if env.ANDROID_HOME is defined %}{{env.ANDROID_HOME}}/ndk/30.0.16248370{% endif %}", tools = true }
+
+[tasks."android:setup"]
+description = "Install Android SDK packages after reviewing their licenses"
+run = [
+  "sdkmanager --licenses",
+  'sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;30.0.16248370"',
+]
+
+[tasks."android:doctor"]
+description = "Check Android tools and whether their binaries run on this host"
+run = "npm run mobile:doctor -- android"

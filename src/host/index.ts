@@ -18,6 +18,11 @@ export interface ArtifactSource {
   load(): Promise<Blob>;
 }
 
+export interface SaveArtifactOptions {
+  signal?: AbortSignal;
+  onProgress?(progress: { received: number; total?: number | null; phase?: "sharing" }): void;
+}
+
 export interface ServerEntry {
   id: string;
   label: string;
@@ -28,7 +33,8 @@ export interface ServerEntry {
 
 export interface ServerRegistry {
   list(): Promise<ServerEntry[]>;
-  selected(): Promise<ServerEntry>;
+  /** Undefined until a server has been chosen on a native first launch. */
+  selected(): Promise<ServerEntry | undefined>;
   select(id: string): Promise<void>;
   add(baseUrl: string, label?: string): Promise<ServerEntry>;
   remove(id: string): Promise<void>;
@@ -42,7 +48,15 @@ export interface Host {
   /** baseUrl scopes credential attachment, so a Cloud token never reaches a LAN server. */
   transport(baseUrl: string): ClientDependencies;
   readonly servers: ServerRegistry;
-  saveArtifact(artifact: ArtifactSource, suggestedName: string): Promise<void>;
+  /** Native-owned authentication. Absent for browser cookie sessions. */
+  readonly auth?: {
+    restore(origin: string): Promise<void>;
+    signIn(origin: string): Promise<void>;
+    cancelSignIn(): Promise<void>;
+    signOut(origin: string): Promise<void>;
+    onChanged(listener: () => void): () => void;
+  };
+  saveArtifact(artifact: ArtifactSource, suggestedName: string, options?: SaveArtifactOptions): Promise<void>;
   openExternal(url: string): Promise<void>;
   /**
    * Fires when the app returns to the foreground. Mobile suspends the process

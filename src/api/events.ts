@@ -28,6 +28,10 @@ export function connectJobEvents(
 ): JobEventStream {
   let source: EventSourceLike | undefined;
   let stopped = false;
+  let disposed = false;
+  let finished = false;
+  let generation = 0;
+  let resuming: Promise<JobResponse> | undefined;
   let attempts = 0;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let lastSequence = 0;
@@ -36,6 +40,7 @@ export function connectJobEvents(
 
   const stop = () => {
     stopped = true;
+    generation += 1;
     clearTimeout(retryTimer);
     retryTimer = undefined;
     source?.close();
@@ -47,7 +52,7 @@ export function connectJobEvents(
       if (stopped) return job;
       if (requestedAt === revision) {
         onSnapshot?.(job);
-        if (terminalStatuses[job.status]) stop();
+        if (terminalStatuses[job.status]) { finished = true; stop(); }
       }
       return job;
     }).finally(() => { recovering = undefined; });
@@ -70,23 +75,44 @@ export function connectJobEvents(
     if (stopped) return;
     const next = new EventSourceConstructor(url, { withCredentials: true });
     source = next;
-    next.onmessage = receive;
-    for (const type of ["running", "progress", "completed", "cancel_requested", "failed", "cancelled"]) next.addEventListener(type, receive);
+    const receiveCurrent = (message: MessageEvent<string>) => { if (source === next) receive(message); };
+    next.onmessage = receiveCurrent;
+    for (const type of ["running", "progress", "completed", "cancel_requested", "failed", "cancelled"]) next.addEventListener(type, receiveCurrent);
     next.onerror = () => {
       if (stopped || source !== next) return;
       if (attempts >= MAX_RECOVERY_ATTEMPTS) { onConnection?.("disconnected"); stop(); return; }
+      const reconnectGeneration = generation;
       onConnection?.("reconnecting");
       attempts += 1;
       next.close();
       if (source === next) source = undefined;
       void recover().then((job) => {
-        if (stopped || terminalStatuses[job.status]) return;
+        if (stopped || reconnectGeneration !== generation || terminalStatuses[job.status]) return;
         retryTimer = setTimeout(connect, attempts * 100);
       }).catch(() => {
-        if (!stopped) retryTimer = setTimeout(connect, attempts * 100);
+        if (!stopped && reconnectGeneration === generation) retryTimer = setTimeout(connect, attempts * 100);
       });
     };
   };
   connect();
-  return { close: stop, onDisconnect: recover };
+  return {
+    close: () => { disposed = true; stop(); },
+    onDisconnect: () => {
+      if (disposed || finished) return recover();
+      if (resuming) return resuming;
+      // A mobile suspension can exhaust retries or leave an apparently live socket.
+      stop();
+      stopped = false;
+      attempts = 0;
+      onConnection?.("reconnecting");
+      resuming = recover().then((job) => {
+        if (!stopped && !terminalStatuses[job.status]) connect();
+        return job;
+      }).catch((error) => {
+        if (!disposed) { onConnection?.("disconnected"); stop(); }
+        throw error;
+      }).finally(() => { resuming = undefined; });
+      return resuming;
+    },
+  };
 }
