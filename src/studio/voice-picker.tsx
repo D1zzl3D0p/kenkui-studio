@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { VoiceResponse } from "../api/generated/v1";
 import catalog from "./voice-catalog.json";
 import { useAudioPlayer, Wave } from "./audio-player";
-export const voiceInfo = (id: string) => catalog.find((v) => v.id === id);
+export const voiceInfo = (id: string) => catalog.find((v) => v.id === id || v.serverId === id);
 export function VoicePicker({
   voices,
   selected,
@@ -92,7 +92,7 @@ export function VoicePicker({
                 disabled={!info}
                 aria-label={`${audio.playing === v.id ? "Pause" : "Preview"} ${v.name}`}
                 title={
-                  info ? "Play voice preview" : "No catalog preview available"
+                  info ? (info.previewKind === "reference" ? "Play reference recording" : "Play voice preview") : "No catalog preview available"
                 }
                 onClick={() => info && audio.toggle(v.id, info.audio)}
               >
@@ -106,7 +106,7 @@ export function VoicePicker({
                 <strong>{v.name}</strong>
                 <span>
                   {info
-                    ? `${info.accent} · ${info.gender}`
+                    ? `${info.accent} · ${info.gender}${info.previewKind === "reference" ? " · Reference recording" : ""}`
                     : v.language || "Voice"}
                 </span>
               </button>

@@ -28,7 +28,8 @@ def main() -> None:
             data_dir=data_dir,
             fixture_mode=True,
             model_allowlist=("fixture-character-model",),
-            voices=(kk.Voice("beatrix-f-vctk-p233-english", "Beatrix", True, "local", "fixture", True),),
+            voices=(kk.Voice("beatrix", "Beatrix", True, "local", "fixture", True),
+                kk.Voice("anna", "Anna", True, "local", "fixture", True),),
             web_build_path=WEB_ROOT / "dist",
         )
         uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("KENKUI_E2E_PORT", "4173")))

@@ -9,7 +9,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7120,
-    "audio": "/audio/voices/alasdair-m-vctk-p246-scottish.m4a"
+    "audio": "/audio/voices/alasdair-m-vctk-p246-scottish.wav",
+    "serverId": "alasdair",
+    "previewKind": "synthesized"
   },
   {
     "id": "alf-m-vctk-p270-english-yorkshire",
@@ -21,7 +23,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 8400,
-    "audio": "/audio/voices/alf-m-vctk-p270-english-yorkshire.m4a"
+    "audio": "/audio/voices/alf-m-vctk-p270-english-yorkshire.wav",
+    "serverId": "alf",
+    "previewKind": "synthesized"
   },
   {
     "id": "angus-m-vctk-p255-scottish",
@@ -33,7 +37,25 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6800,
-    "audio": "/audio/voices/angus-m-vctk-p255-scottish.m4a"
+    "audio": "/audio/voices/angus-m-vctk-p255-scottish.wav",
+    "serverId": "angus",
+    "previewKind": "synthesized"
+  },
+  {
+    "id": "anna",
+    "serverId": "anna",
+    "name": "Anna",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Female",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 12572,
+    "audio": "/audio/voices/anna-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p228_023_enhanced.wav",
+    "sourceSha256": "0a6de25cf12bf1540beb85979f306a92be81fecc051c547c5395e7e5237a3856"
   },
   {
     "id": "aoife-f-vctk-p351-northernirish",
@@ -45,7 +67,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6000,
-    "audio": "/audio/voices/aoife-f-vctk-p351-northernirish.m4a"
+    "audio": "/audio/voices/aoife-f-vctk-p351-northernirish.wav",
+    "serverId": "aoife",
+    "previewKind": "synthesized"
   },
   {
     "id": "arjun-m-vctk-p251-indian",
@@ -57,7 +81,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6720,
-    "audio": "/audio/voices/arjun-m-vctk-p251-indian.m4a"
+    "audio": "/audio/voices/arjun-m-vctk-p251-indian.wav",
+    "serverId": "arjun",
+    "previewKind": "synthesized"
   },
   {
     "id": "aroha-f-vctk-p335-newzealand",
@@ -69,7 +95,25 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7200,
-    "audio": "/audio/voices/aroha-f-vctk-p335-newzealand.m4a"
+    "audio": "/audio/voices/aroha-f-vctk-p335-newzealand.wav",
+    "serverId": "aroha",
+    "previewKind": "synthesized"
+  },
+  {
+    "id": "azelma",
+    "serverId": "azelma",
+    "name": "Azelma",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Female",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 12872,
+    "audio": "/audio/voices/azelma-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p303_023_enhanced.wav",
+    "sourceSha256": "60e3d26cdf2efdec5df712152c839928f4d5522821e6554ae11fd96c57ab1026"
   },
   {
     "id": "beatrix-f-vctk-p233-english",
@@ -81,7 +125,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6720,
-    "audio": "/audio/voices/beatrix-f-vctk-p233-english.wav"
+    "audio": "/audio/voices/beatrix-f-vctk-p233-english.wav",
+    "serverId": "beatrix",
+    "previewKind": "synthesized"
   },
   {
     "id": "benny-m-vctk-p286-english-geordie",
@@ -93,7 +139,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7840,
-    "audio": "/audio/voices/benny-m-vctk-p286-english-geordie.m4a"
+    "audio": "/audio/voices/benny-m-vctk-p286-english-geordie.wav",
+    "serverId": "benny",
+    "previewKind": "synthesized"
   },
   {
     "id": "bram-m-vctk-p260-scottish",
@@ -105,7 +153,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6480,
-    "audio": "/audio/voices/bram-m-vctk-p260-scottish.m4a"
+    "audio": "/audio/voices/bram-m-vctk-p260-scottish.wav",
+    "serverId": "bram",
+    "previewKind": "synthesized"
   },
   {
     "id": "bridget-f-vctk-p305-american-philadelphia",
@@ -117,7 +167,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6800,
-    "audio": "/audio/voices/bridget-f-vctk-p305-american-philadelphia.m4a"
+    "audio": "/audio/voices/bridget-f-vctk-p305-american-philadelphia.wav",
+    "serverId": "bridget",
+    "previewKind": "synthesized"
   },
   {
     "id": "brigid-f-vctk-p283-irish",
@@ -129,7 +181,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6560,
-    "audio": "/audio/voices/brigid-f-vctk-p283-irish.m4a"
+    "audio": "/audio/voices/brigid-f-vctk-p283-irish.wav",
+    "serverId": "brigid",
+    "previewKind": "synthesized"
   },
   {
     "id": "bronwen-f-vctk-p253-welsh",
@@ -141,7 +195,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6800,
-    "audio": "/audio/voices/bronwen-f-vctk-p253-welsh.m4a"
+    "audio": "/audio/voices/bronwen-f-vctk-p253-welsh.wav",
+    "serverId": "bronwen",
+    "previewKind": "synthesized"
   },
   {
     "id": "callum-m-vctk-p237-scottish",
@@ -153,7 +209,25 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7040,
-    "audio": "/audio/voices/callum-m-vctk-p237-scottish.m4a"
+    "audio": "/audio/voices/callum-m-vctk-p237-scottish.wav",
+    "serverId": "callum",
+    "previewKind": "synthesized"
+  },
+  {
+    "id": "charles",
+    "serverId": "charles",
+    "name": "Charles",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Male",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 9988,
+    "audio": "/audio/voices/charles-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p254_023_enhanced.wav",
+    "sourceSha256": "6b681a429198f16e378d53bccb08d06939da7b00144a7696111d4f8f76be7756"
   },
   {
     "id": "ciaran-m-vctk-p245-irish",
@@ -165,7 +239,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6880,
-    "audio": "/audio/voices/ciaran-m-vctk-p245-irish.m4a"
+    "audio": "/audio/voices/ciaran-m-vctk-p245-irish.wav",
+    "serverId": "ciaran",
+    "previewKind": "synthesized"
   },
   {
     "id": "declan-m-vctk-p304-northernirish",
@@ -177,7 +253,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6640,
-    "audio": "/audio/voices/declan-m-vctk-p304-northernirish.m4a"
+    "audio": "/audio/voices/declan-m-vctk-p304-northernirish.wav",
+    "serverId": "declan",
+    "previewKind": "synthesized"
   },
   {
     "id": "deon-m-vctk-p347-southafrican",
@@ -189,7 +267,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7440,
-    "audio": "/audio/voices/deon-m-vctk-p347-southafrican.m4a"
+    "audio": "/audio/voices/deon-m-vctk-p347-southafrican.wav",
+    "serverId": "deon",
+    "previewKind": "synthesized"
   },
   {
     "id": "dolly-f-vctk-p310-american-tennessee",
@@ -201,7 +281,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 8000,
-    "audio": "/audio/voices/dolly-f-vctk-p310-american-tennessee.wav"
+    "audio": "/audio/voices/dolly-f-vctk-p310-american-tennessee.wav",
+    "serverId": "dolly",
+    "previewKind": "synthesized"
   },
   {
     "id": "earl-m-vctk-p311-american-midwest",
@@ -213,7 +295,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6480,
-    "audio": "/audio/voices/earl-m-vctk-p311-american-midwest.m4a"
+    "audio": "/audio/voices/earl-m-vctk-p311-american-midwest.wav",
+    "serverId": "earl",
+    "previewKind": "synthesized"
   },
   {
     "id": "elspeth-f-vctk-s5-british",
@@ -225,7 +309,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7280,
-    "audio": "/audio/voices/elspeth-f-vctk-s5-british.m4a"
+    "audio": "/audio/voices/elspeth-f-vctk-s5-british.wav",
+    "serverId": "elspeth",
+    "previewKind": "synthesized"
   },
   {
     "id": "eoin-m-vctk-p364-irish",
@@ -237,7 +323,57 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7360,
-    "audio": "/audio/voices/eoin-m-vctk-p364-irish.wav"
+    "audio": "/audio/voices/eoin-m-vctk-p364-irish.wav",
+    "serverId": "eoin",
+    "previewKind": "synthesized"
+  },
+  {
+    "id": "eponine",
+    "serverId": "eponine",
+    "name": "Eponine",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Female",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 11192,
+    "audio": "/audio/voices/eponine-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p262_023_enhanced.wav",
+    "sourceSha256": "a13c27fb47627b05223691a0ef2974358a18c886e6c2f9d2762ff1d02c20926b"
+  },
+  {
+    "id": "eve",
+    "serverId": "eve",
+    "name": "Eve",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Female",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 10497,
+    "audio": "/audio/voices/eve-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p361_023_enhanced.wav",
+    "sourceSha256": "396e7cbd066b0f3fb6d67fa26e7904076958239d736d4390f15b5fe88feb14cd"
+  },
+  {
+    "id": "fantine",
+    "serverId": "fantine",
+    "name": "Fantine",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Female",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 10544,
+    "audio": "/audio/voices/fantine-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p244_023_enhanced.wav",
+    "sourceSha256": "5f07d4e2a3f20a15572aae885156b43ef3fc12ef3812996fd135680d9956448b"
   },
   {
     "id": "fergus-m-vctk-p247-scottish",
@@ -249,7 +385,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7040,
-    "audio": "/audio/voices/fergus-m-vctk-p247-scottish.m4a"
+    "audio": "/audio/voices/fergus-m-vctk-p247-scottish.wav",
+    "serverId": "fergus",
+    "previewKind": "synthesized"
   },
   {
     "id": "finlay-m-vctk-p263-scottish",
@@ -261,7 +399,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6240,
-    "audio": "/audio/voices/finlay-m-vctk-p263-scottish.m4a"
+    "audio": "/audio/voices/finlay-m-vctk-p263-scottish.wav",
+    "serverId": "finlay",
+    "previewKind": "synthesized"
   },
   {
     "id": "flynn-m-vctk-p326-australian",
@@ -273,7 +413,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6400,
-    "audio": "/audio/voices/flynn-m-vctk-p326-australian.m4a"
+    "audio": "/audio/voices/flynn-m-vctk-p326-australian.wav",
+    "serverId": "flynn",
+    "previewKind": "synthesized"
   },
   {
     "id": "frankie-f-vctk-p297-american-newyork",
@@ -285,7 +427,25 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7920,
-    "audio": "/audio/voices/frankie-f-vctk-p297-american-newyork.m4a"
+    "audio": "/audio/voices/frankie-f-vctk-p297-american-newyork.wav",
+    "serverId": "frankie",
+    "previewKind": "synthesized"
+  },
+  {
+    "id": "george",
+    "serverId": "george",
+    "name": "George",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Male",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 10041,
+    "audio": "/audio/voices/george-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p315_023_enhanced.wav",
+    "sourceSha256": "29a41f93bf5236e5b21501091d7774c255d5f3d4e62fa4f9fdf0a92a793c84ae"
   },
   {
     "id": "georgie-f-vctk-p269-english-geordie",
@@ -297,7 +457,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6640,
-    "audio": "/audio/voices/georgie-f-vctk-p269-english-geordie.m4a"
+    "audio": "/audio/voices/georgie-f-vctk-p269-english-geordie.wav",
+    "serverId": "georgie",
+    "previewKind": "synthesized"
   },
   {
     "id": "hamish-m-vctk-p252-scottish",
@@ -309,7 +471,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6720,
-    "audio": "/audio/voices/hamish-m-vctk-p252-scottish.m4a"
+    "audio": "/audio/voices/hamish-m-vctk-p252-scottish.wav",
+    "serverId": "hamish",
+    "previewKind": "synthesized"
   },
   {
     "id": "isabeau-f-vctk-p280-french",
@@ -321,7 +485,25 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6960,
-    "audio": "/audio/voices/isabeau-f-vctk-p280-french.m4a"
+    "audio": "/audio/voices/isabeau-f-vctk-p280-french.wav",
+    "serverId": "isabeau",
+    "previewKind": "synthesized"
+  },
+  {
+    "id": "jane",
+    "serverId": "jane",
+    "name": "Jane",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Female",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 11864,
+    "audio": "/audio/voices/jane-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p339_023_enhanced.wav",
+    "sourceSha256": "2f12e7f155eb3118f55425394f1b049e5b1b67bdc9b3932c8ba4521420aeb84a"
   },
   {
     "id": "laurel-f-vctk-p343-canadian",
@@ -333,7 +515,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7360,
-    "audio": "/audio/voices/laurel-f-vctk-p343-canadian.m4a"
+    "audio": "/audio/voices/laurel-f-vctk-p343-canadian.wav",
+    "serverId": "laurel",
+    "previewKind": "synthesized"
   },
   {
     "id": "lexie-f-vctk-p306-american-newyork",
@@ -345,7 +529,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 8080,
-    "audio": "/audio/voices/lexie-f-vctk-p306-american-newyork.m4a"
+    "audio": "/audio/voices/lexie-f-vctk-p306-american-newyork.wav",
+    "serverId": "lexie",
+    "previewKind": "synthesized"
   },
   {
     "id": "mabel-f-vctk-p267-english-yorkshire",
@@ -357,7 +543,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7040,
-    "audio": "/audio/voices/mabel-f-vctk-p267-english-yorkshire.wav"
+    "audio": "/audio/voices/mabel-f-vctk-p267-english-yorkshire.wav",
+    "serverId": "mabel",
+    "previewKind": "synthesized"
   },
   {
     "id": "marco-m-vctk-p334-american-chicago",
@@ -369,7 +557,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 5920,
-    "audio": "/audio/voices/marco-m-vctk-p334-american-chicago.m4a"
+    "audio": "/audio/voices/marco-m-vctk-p334-american-chicago.wav",
+    "serverId": "marco",
+    "previewKind": "synthesized"
   },
   {
     "id": "marin-f-vctk-p299-american-california",
@@ -381,7 +571,41 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6720,
-    "audio": "/audio/voices/marin-f-vctk-p299-american-california.wav"
+    "audio": "/audio/voices/marin-f-vctk-p299-american-california.wav",
+    "serverId": "marin",
+    "previewKind": "synthesized"
+  },
+  {
+    "id": "mary",
+    "serverId": "mary",
+    "name": "Mary",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Female",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 9985,
+    "audio": "/audio/voices/mary-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p333_023_enhanced.wav",
+    "sourceSha256": "a35b0468382218e9f37a9a7494d1e4b74deaf18d7ced22265b4e325bb55c183f"
+  },
+  {
+    "id": "michael",
+    "serverId": "michael",
+    "name": "Michael",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Male",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 11736,
+    "audio": "/audio/voices/michael-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p360_023_enhanced.wav",
+    "sourceSha256": "b6743e9195e5e3fd34fe9d1633ae93f7ffab787b249e45f6467d7d6f7a6ee6ad"
   },
   {
     "id": "moira-f-vctk-p249-scottish",
@@ -393,7 +617,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6480,
-    "audio": "/audio/voices/moira-f-vctk-p249-scottish.m4a"
+    "audio": "/audio/voices/moira-f-vctk-p249-scottish.wav",
+    "serverId": "moira",
+    "previewKind": "synthesized"
   },
   {
     "id": "nora-f-vctk-p308-american",
@@ -405,7 +631,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6480,
-    "audio": "/audio/voices/nora-f-vctk-p308-american.m4a"
+    "audio": "/audio/voices/nora-f-vctk-p308-american.wav",
+    "serverId": "nora",
+    "previewKind": "synthesized"
   },
   {
     "id": "ozzy-m-vctk-p256-english-birmingham",
@@ -417,7 +645,25 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7040,
-    "audio": "/audio/voices/ozzy-m-vctk-p256-english-birmingham.m4a"
+    "audio": "/audio/voices/ozzy-m-vctk-p256-english-birmingham.wav",
+    "serverId": "ozzy",
+    "previewKind": "synthesized"
+  },
+  {
+    "id": "paul",
+    "serverId": "paul",
+    "name": "Paul",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Male",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 11205,
+    "audio": "/audio/voices/paul-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p259_023_enhanced.wav",
+    "sourceSha256": "7aba504fe0b3b16478b69eb27ce6007e3cb42b0c1915b5f1c6a6024ae37d679b"
   },
   {
     "id": "priya-f-vctk-p248-indian",
@@ -429,7 +675,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7520,
-    "audio": "/audio/voices/priya-f-vctk-p248-indian.m4a"
+    "audio": "/audio/voices/priya-f-vctk-p248-indian.wav",
+    "serverId": "priya",
+    "previewKind": "synthesized"
   },
   {
     "id": "reid-m-vctk-p363-canadian",
@@ -441,7 +689,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6000,
-    "audio": "/audio/voices/reid-m-vctk-p363-canadian.m4a"
+    "audio": "/audio/voices/reid-m-vctk-p363-canadian.wav",
+    "serverId": "reid",
+    "previewKind": "synthesized"
   },
   {
     "id": "rex-m-vctk-p243-english-london",
@@ -453,7 +703,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6560,
-    "audio": "/audio/voices/rex-m-vctk-p243-english-london.m4a"
+    "audio": "/audio/voices/rex-m-vctk-p243-english-london.wav",
+    "serverId": "rex",
+    "previewKind": "synthesized"
   },
   {
     "id": "rohan-m-vctk-p376-indian",
@@ -465,7 +717,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6400,
-    "audio": "/audio/voices/rohan-m-vctk-p376-indian.m4a"
+    "audio": "/audio/voices/rohan-m-vctk-p376-indian.wav",
+    "serverId": "rohan",
+    "previewKind": "synthesized"
   },
   {
     "id": "rory-m-vctk-p272-scottish",
@@ -477,7 +731,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6480,
-    "audio": "/audio/voices/rory-m-vctk-p272-scottish.m4a"
+    "audio": "/audio/voices/rory-m-vctk-p272-scottish.wav",
+    "serverId": "rory",
+    "previewKind": "synthesized"
   },
   {
     "id": "saoirse-f-vctk-p266-irish",
@@ -489,7 +745,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7360,
-    "audio": "/audio/voices/saoirse-f-vctk-p266-irish.m4a"
+    "audio": "/audio/voices/saoirse-f-vctk-p266-irish.wav",
+    "serverId": "saoirse",
+    "previewKind": "synthesized"
   },
   {
     "id": "seamus-m-vctk-p298-irish",
@@ -501,7 +759,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6160,
-    "audio": "/audio/voices/seamus-m-vctk-p298-irish.m4a"
+    "audio": "/audio/voices/seamus-m-vctk-p298-irish.wav",
+    "serverId": "seamus",
+    "previewKind": "synthesized"
   },
   {
     "id": "tavish-m-vctk-p284-scottish",
@@ -513,7 +773,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6000,
-    "audio": "/audio/voices/tavish-m-vctk-p284-scottish.m4a"
+    "audio": "/audio/voices/tavish-m-vctk-p284-scottish.wav",
+    "serverId": "tavish",
+    "previewKind": "synthesized"
   },
   {
     "id": "thandi-f-vctk-p323-southafrican",
@@ -525,7 +787,25 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 8000,
-    "audio": "/audio/voices/thandi-f-vctk-p323-southafrican.m4a"
+    "audio": "/audio/voices/thandi-f-vctk-p323-southafrican.wav",
+    "serverId": "thandi",
+    "previewKind": "synthesized"
+  },
+  {
+    "id": "vera",
+    "serverId": "vera",
+    "name": "Vera",
+    "accent": "Unspecified accent",
+    "accentGroup": "Unspecified",
+    "gender": "Female",
+    "license": "CC-BY-4.0",
+    "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
+    "previewText": "",
+    "previewKind": "reference",
+    "durationMs": 10803,
+    "audio": "/audio/voices/vera-reference.wav",
+    "sourceUrl": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/vctk/p229_023_enhanced.wav",
+    "sourceSha256": "309cf91a895830f15842b398f69a4962cb1f7e0bfab10e25dd27838e826c204b"
   },
   {
     "id": "vivienne-f-vctk-p231-english",
@@ -537,7 +817,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 6080,
-    "audio": "/audio/voices/vivienne-f-vctk-p231-english.m4a"
+    "audio": "/audio/voices/vivienne-f-vctk-p231-english.wav",
+    "serverId": "vivienne",
+    "previewKind": "synthesized"
   },
   {
     "id": "wren-f-vctk-p301-american",
@@ -549,7 +831,9 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 5760,
-    "audio": "/audio/voices/wren-f-vctk-p301-american.m4a"
+    "audio": "/audio/voices/wren-f-vctk-p301-american.wav",
+    "serverId": "wren",
+    "previewKind": "synthesized"
   },
   {
     "id": "zola-f-vctk-p314-southafrican",
@@ -561,6 +845,8 @@
     "rights": "Derived from the VCTK corpus via kyutai/tts-voices. Review the VCTK terms and speaker consent for your intended use before commercial deployment.",
     "previewText": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
     "durationMs": 7280,
-    "audio": "/audio/voices/zola-f-vctk-p314-southafrican.m4a"
+    "audio": "/audio/voices/zola-f-vctk-p314-southafrican.wav",
+    "serverId": "zola",
+    "previewKind": "synthesized"
   }
 ]

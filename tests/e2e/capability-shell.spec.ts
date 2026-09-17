@@ -103,6 +103,10 @@ test("mobile themes, exclusive voice auditions, and audio-driven waveform", asyn
         ),
     )
     .toBe(true);
+  await page.getByRole("button", { name: "Preview Anna" }).click();
+  await expect(page.getByRole("button", { name: "Pause Anna" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Preview Beatrix" })).toBeVisible();
+  await expect(page.getByText(/Reference recording/)).toBeVisible();
   await page.screenshot({ path: "test-results/mobile-voice-picker.png" });
   await page.getByRole("button", { name: "Use voice" }).click();
   await expect(
@@ -110,11 +114,9 @@ test("mobile themes, exclusive voice auditions, and audio-driven waveform", asyn
   ).toHaveCount(0);
   await page.getByLabel("Appearance").selectOption("dark");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Play example" }).click();
-  await expect(
-    page.getByRole("button", { name: "Pause example" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Pause example" }).click();
+  await expect(page.getByRole("heading", { name: "Review & create" })).toBeVisible();
+  await expect(page.getByText("Hear the difference")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Play example" })).toHaveCount(0);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

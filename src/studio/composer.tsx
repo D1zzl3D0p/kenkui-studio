@@ -11,7 +11,6 @@ import { BookCover } from "./cover";
 import { requestFor, pauseLengthsFor, validPauseLength, type Draft } from "./store";
 import { VoicePicker, voiceInfo } from "./voice-picker";
 import { PauseControls, PauseReview, SpeechControls, SpeechReview } from "./speech-settings";
-import { ScenePreview } from "./scene-preview";
 
 export function Composer({
   draft: d,
@@ -593,9 +592,8 @@ export function Composer({
             ) : (
               <>
                 <div className="eyebrow">03 / CREATE</div>
-                <h2>Preview & create</h2>
+                <h2>Review & create</h2>
                 <p className="muted">Review your choices before starting.</p>
-                <ScenePreview fullCast={d.mode === "characters"} />
                 <dl className="review">
                   <div>
                     <dt>Narration</dt>
