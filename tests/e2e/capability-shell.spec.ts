@@ -4,6 +4,11 @@ test("uploads a cover, resumes a draft, and downloads a completed book", async (
   page,
 }) => {
   const errors: string[] = [];
+  let submittedTts: unknown;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/v1/jobs")
+      submittedTts = request.postDataJSON().tts;
+  });
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("response", (r) => {
     if (r.status() >= 500) errors.push(`${r.status()} ${r.url()}`);
@@ -39,6 +44,17 @@ test("uploads a cover, resumes a draft, and downloads a completed book", async (
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("button", { name: /Full cast/ }).click();
   await expect(page.getByText("Automatic character casting")).toBeVisible();
+  await page.getByText("Pacing · 1500 ms between chapters", { exact: true }).click();
+  await expect(page.getByLabel("Between chapters (ms)")).toHaveValue("1500");
+  await page.getByLabel("Between chapters (ms)").fill("2200");
+  await page.getByLabel("Before headings (ms)").fill("150");
+  await page.getByLabel("After headings (ms)").fill("600");
+  await page.getByLabel("Between paragraphs (ms)").fill("250");
+  await page.getByLabel("Between lines (ms)").fill("100");
+  await page.getByText("Speech preparation · 2 enabled", { exact: true }).click();
+  await expect(page.getByLabel("Prepare numbers for narration")).toBeChecked();
+  await expect(page.getByLabel("Use pronunciation corrections")).toBeChecked();
+  await page.getByLabel("Improve stuttered dialogue").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page
     .getByRole("button", { name: "Create audiobook", exact: true })
@@ -46,6 +62,7 @@ test("uploads a cover, resumes a draft, and downloads a completed book", async (
   await expect(
     page.getByRole("heading", { name: "Your audiobook is ready" }),
   ).toBeVisible();
+  expect(submittedTts).toEqual({ normalizeText: true, chapterPauses: true, prepareNumbers: true, pronunciationCorrections: true, stutterHandling: true, chapterPauseMs: 2200, headingBeforePauseMs: 150, headingAfterPauseMs: 600, paragraphPauseMs: 250, linePauseMs: 100 });
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download M4B" }).click();
   expect((await downloadPromise).suggestedFilename()).toBe("My audiobook.m4b");

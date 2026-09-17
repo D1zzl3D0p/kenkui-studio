@@ -1,5 +1,31 @@
 import type { BookResponse, JobRequest } from "../api/generated/v1";
+export const defaultSpeechSettings = {
+  chapterPauses: true,
+  prepareNumbers: true,
+  pronunciationCorrections: true,
+  stutterHandling: false,
+};
+export type SpeechSettings = typeof defaultSpeechSettings;
+export const defaultPauseLengths = {
+  chapterPauseMs: "1500",
+  headingBeforePauseMs: "0",
+  headingAfterPauseMs: "0",
+  paragraphPauseMs: "0",
+  linePauseMs: "0",
+};
+export type PauseLengths = typeof defaultPauseLengths;
+export function validPauseLength(value: string): boolean {
+  return /^\d+$/.test(value.trim()) && Number(value) <= 60_000;
+}
+export function pauseLengthsFor(d: Pick<Draft, "pauseLengths" | "speechSettings">): PauseLengths {
+  return d.pauseLengths ?? {
+    ...defaultPauseLengths,
+    chapterPauseMs: d.speechSettings?.chapterPauses ? "1500" : "0",
+  };
+}
 export type Draft = {
+  pauseLengths?: PauseLengths;
+  speechSettings?: SpeechSettings;
   id: string;
   book: BookResponse;
   originalSourceId: string;
@@ -29,7 +55,7 @@ export type Library = { drafts: Draft[]; records: Record[] };
 export const uid = () =>
   globalThis.crypto?.randomUUID?.() ??
   `studio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-export function requestFor(d: Draft): JobRequest {
+export function requestFor(d: Draft, supportsSpeechSettings = true, supportsPauseLengths = true): JobRequest {
   return {
     sourceId: d.book.sourceId,
     chapters: d.chapters,
@@ -42,7 +68,14 @@ export function requestFor(d: Draft): JobRequest {
             method: d.method,
             modelId: d.model,
           },
-    tts: { normalizeText: true },
+    tts: {
+      normalizeText: true,
+      ...(supportsSpeechSettings ? d.speechSettings : undefined),
+      ...(supportsPauseLengths && d.pauseLengths &&
+        Object.values(d.pauseLengths).every(validPauseLength)
+        ? Object.fromEntries(Object.entries(d.pauseLengths).map(([key, value]) => [key, Number(value)]))
+        : {}),
+    },
     output: {
       format: d.format,
       title: d.title.trim() || null,
@@ -79,6 +112,15 @@ export function readLibrary(key: string): Library {
           typeof d.method === "string" &&
           typeof d.unknown === "string" &&
           typeof d.originalSourceId === "string" &&
+          (d.pauseLengths === undefined ||
+            (d.pauseLengths !== null && Object.keys(defaultPauseLengths).every(
+              (key) => typeof d.pauseLengths?.[key as keyof PauseLengths] === "string",
+            ))) &&
+          (d.speechSettings === undefined ||
+            (d.speechSettings !== null &&
+              Object.keys(defaultSpeechSettings).every(
+                (key) => typeof d.speechSettings?.[key as keyof SpeechSettings] === "boolean",
+              ))) &&
           [1, 2, 3].includes(d.step) &&
           d.book.chapters.every(
             (c) => c && typeof c.id === "string" && typeof c.title === "string",

@@ -8,8 +8,9 @@ import type {
 } from "../api/generated/v1";
 import { ErrorMessage } from "../components/error-message";
 import { BookCover } from "./cover";
-import { requestFor, type Draft } from "./store";
+import { requestFor, pauseLengthsFor, validPauseLength, type Draft } from "./store";
 import { VoicePicker, voiceInfo } from "./voice-picker";
+import { PauseControls, PauseReview, SpeechControls, SpeechReview } from "./speech-settings";
 import { ScenePreview } from "./scene-preview";
 
 export function Composer({
@@ -45,14 +46,19 @@ export function Composer({
   useEffect(() => {
     if (!d.narrator && voices[0]) update({ narrator: voices[0].id });
   }, [d.narrator, voices]);
-  const payload = useMemo(() => requestFor(d), [d]);
+  const payload = useMemo(
+    () => requestFor(d, cap.speechSettings === true, cap.pauseLengths === true),
+    [d, cap.speechSettings, cap.pauseLengths],
+  );
   const fingerprint = JSON.stringify(payload);
   const latest = useRef(fingerprint);
   latest.current = fingerprint;
   const supportsCast =
     cap.casting?.modes?.includes("characters") &&
     Boolean(cap.casting.models?.length);
+  const pauseLengths = pauseLengthsFor(d);
   const valid = Boolean(
+    (!cap.pauseLengths || Object.values(pauseLengths).every(validPauseLength)) &&
     d.title.trim() &&
     d.chapters.length &&
     voices.some((v) => v.id === d.narrator) &&
@@ -551,6 +557,16 @@ export function Composer({
                     </p>
                   </details>
                 )}
+                {cap.pauseLengths && (
+                  <PauseControls value={pauseLengths} onChange={(pauseLengths) => update({ pauseLengths })} />
+                )}
+                {cap.speechSettings && (
+                  <SpeechControls
+                    showChapterToggle={!cap.pauseLengths}
+                    value={d.speechSettings}
+                    onChange={(speechSettings) => update({ speechSettings })}
+                  />
+                )}
                 {estimate}
                 <div className="editor-footer">
                   <button className="secondary" onClick={() => step(1)}>
@@ -601,6 +617,14 @@ export function Composer({
                     <dd>{d.format.toUpperCase()}</dd>
                   </div>
                 </dl>
+                {cap.pauseLengths && <PauseReview value={pauseLengths} />}
+                {cap.speechSettings && <SpeechReview value={d.speechSettings} showChapterToggle={!cap.pauseLengths} />}
+                {!cap.pauseLengths && d.pauseLengths && (
+                  <p role="status">This server cannot apply custom pause lengths.</p>
+                )}
+                {!cap.speechSettings && d.speechSettings && (
+                  <p role="status">This server cannot apply the saved pacing and speech preparation settings.</p>
+                )}
                 {(cap.outputFormats?.length ?? 0) > 1 && (
                   <details>
                     <summary>Advanced</summary>

@@ -15,6 +15,8 @@ import { BookCover } from "./cover";
 import { JobView, statusLabel } from "./job-view";
 import {
   changeDraft,
+  defaultSpeechSettings,
+  defaultPauseLengths,
   readLibrary,
   uid,
   type Draft,
@@ -229,6 +231,8 @@ export function Studio({
         method: "gendered",
         format: cap.outputFormats?.[0] || "m4b",
         sourceCover: true,
+        pauseLengths: cap.pauseLengths ? { ...defaultPauseLengths } : undefined,
+        speechSettings: cap.speechSettings ? { ...defaultSpeechSettings } : undefined,
         step: 1,
         key: uid(),
         updated: Date.now(),

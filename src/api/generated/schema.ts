@@ -413,6 +413,16 @@ export interface components {
              */
             covers?: components["schemas"]["CoverCapabilities"];
             /**
+             * Pauselengths
+             * @default true
+             */
+            pauseLengths?: boolean;
+            /**
+             * Speechsettings
+             * @default true
+             */
+            speechSettings?: boolean;
+            /**
              * Maxuploadbytes
              * @default 52428800
              */
@@ -582,7 +592,15 @@ export interface components {
             casting: components["schemas"]["CastingRequest"];
             /**
              * @default {
-             *       "normalizeText": true
+             *       "normalizeText": true,
+             *       "chapterPauses": false,
+             *       "prepareNumbers": false,
+             *       "pronunciationCorrections": false,
+             *       "stutterHandling": false,
+             *       "headingBeforePauseMs": 0,
+             *       "headingAfterPauseMs": 0,
+             *       "paragraphPauseMs": 0,
+             *       "linePauseMs": 0
              *     }
              */
             tts?: components["schemas"]["TtsRequest"];
@@ -672,6 +690,49 @@ export interface components {
              * @default true
              */
             normalizeText?: boolean;
+            /**
+             * Chapterpauses
+             * @deprecated
+             * @default false
+             */
+            chapterPauses?: boolean;
+            /**
+             * Preparenumbers
+             * @default false
+             */
+            prepareNumbers?: boolean;
+            /**
+             * Pronunciationcorrections
+             * @default false
+             */
+            pronunciationCorrections?: boolean;
+            /**
+             * Stutterhandling
+             * @default false
+             */
+            stutterHandling?: boolean;
+            /** Chapterpausems */
+            chapterPauseMs?: number | null;
+            /**
+             * Headingbeforepausems
+             * @default 0
+             */
+            headingBeforePauseMs?: number;
+            /**
+             * Headingafterpausems
+             * @default 0
+             */
+            headingAfterPauseMs?: number;
+            /**
+             * Paragraphpausems
+             * @default 0
+             */
+            paragraphPauseMs?: number;
+            /**
+             * Linepausems
+             * @default 0
+             */
+            linePauseMs?: number;
         };
         /** ValidationError */
         ValidationError: {

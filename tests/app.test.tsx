@@ -10,6 +10,8 @@ import { App } from "../src/app";
 import { fakeHost } from "./fakes/host";
 import {
   requestFor,
+  pauseLengthsFor,
+  defaultSpeechSettings,
   changeDraft,
   readLibrary,
   type Draft,
@@ -573,4 +575,57 @@ it("returns from billing to a full-cast draft and checks the replenished balance
     narratorVoiceId: "voice-1", unknownVoiceId: "voice-1", modelId: "allowed-model", method: "gendered",
   });
   expect(client.upload).toHaveBeenCalledTimes(1);
+});
+
+
+describe("pacing and speech preparation", () => {
+  it("persists defaults and overrides and submits the same settings it estimates", async () => {
+    const client = makeClient({ capabilities: vi.fn().mockResolvedValue({ ...capabilities, speechSettings: true, pauseLengths: true }) });
+    const mounted = render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "Narration" });
+    expect(screen.getByLabelText("Between chapters (ms)")).toHaveValue("1500");
+    expect(screen.getByLabelText("Prepare numbers for narration")).toBeChecked();
+    expect(screen.getByLabelText("Use pronunciation corrections")).toBeChecked();
+    expect(screen.getByLabelText("Improve stuttered dialogue")).not.toBeChecked();
+    fireEvent.change(screen.getByLabelText("Between chapters (ms)"), { target: { value: "2300" } });
+    fireEvent.change(screen.getByLabelText("After headings (ms)"), { target: { value: "650" } });
+    fireEvent.change(screen.getByLabelText("Between lines (ms)"), { target: { value: "60001" } });
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    expect(screen.getByLabelText("Between lines (ms)")).toHaveAttribute("aria-invalid", "true");
+    fireEvent.change(screen.getByLabelText("Between lines (ms)"), { target: { value: "0" } });
+    fireEvent.click(screen.getByLabelText("Prepare numbers for narration"));
+    fireEvent.click(screen.getByLabelText("Improve stuttered dialogue"));
+    mounted.unmount();
+    render(<App client={client as never} host={fakeHost()} />);
+    await screen.findByRole("heading", { name: "Narration" });
+    expect(screen.getByLabelText("Between chapters (ms)")).toHaveValue("2300");
+    expect(screen.getByLabelText("After headings (ms)")).toHaveValue("650");
+    expect(screen.getByLabelText("Improve stuttered dialogue")).toBeChecked();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Create audiobook" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Create audiobook" }));
+    await screen.findByRole("heading", { name: "Creating your audiobook" });
+    const payload = client.createJob.mock.calls[0][0];
+    expect(payload.tts).toEqual({ normalizeText: true, chapterPauses: true, prepareNumbers: false, pronunciationCorrections: true, stutterHandling: true, chapterPauseMs: 2300, headingBeforePauseMs: 0, headingAfterPauseMs: 650, paragraphPauseMs: 0, linePauseMs: 0 });
+    expect(client.preflight).toHaveBeenLastCalledWith(payload);
+  });
+
+  it("does not offer new settings on older servers", async () => {
+    render(<App client={makeClient() as never} host={fakeHost()} />);
+    await upload();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "Narration" });
+    expect(screen.queryByLabelText("Pause between chapters")).toBeNull();
+    expect(screen.queryByLabelText("Prepare numbers for narration")).toBeNull();
+  });
+});
+
+
+it("preserves old chapter-pause choices when opening the duration fields", () => {
+  expect(pauseLengthsFor({}).chapterPauseMs).toBe("0");
+  expect(pauseLengthsFor({ speechSettings: defaultSpeechSettings }).chapterPauseMs).toBe("1500");
+  expect(pauseLengthsFor({ speechSettings: { ...defaultSpeechSettings, chapterPauses: false } }).chapterPauseMs).toBe("0");
 });
