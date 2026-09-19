@@ -8,6 +8,7 @@ import type {
 } from "../api/generated/v1";
 import { ErrorMessage } from "../components/error-message";
 import { BookCover } from "./cover";
+import { chapterSummary, isLongChapter, narrationOf } from "./estimates";
 import { requestFor, pauseLengthsFor, validPauseLength, type Draft } from "./store";
 import { VoicePicker, voiceInfo } from "./voice-picker";
 import { PauseControls, PauseReview, SpeechControls, SpeechReview } from "./speech-settings";
@@ -63,6 +64,7 @@ export function Composer({
     cap.casting?.modes?.includes("characters") &&
     Boolean(cap.casting.models?.length);
   const pauseLengths = pauseLengthsFor(d);
+  const narration = narrationOf(cap);
   const valid = Boolean(
     (!cap.pauseLengths || Object.values(pauseLengths).every(validPauseLength)) &&
     d.title.trim() &&
@@ -75,10 +77,13 @@ export function Composer({
   useEffect(() => {
     if (!valid) return;
     let live = true;
+    // Quoting a long book is expensive server-side; abandon the old request
+    // rather than leaving it to finish for a price nobody is waiting for.
+    const abort = new AbortController();
     setQuoteError(undefined);
     const timeout = setTimeout(() => {
       void client
-        .preflight(JSON.parse(fingerprint))
+        .preflight(JSON.parse(fingerprint), abort.signal)
         .then((value) => {
           if (live) setQuote({ key: fingerprint, value });
         })
@@ -92,6 +97,7 @@ export function Composer({
     return () => {
       live = false;
       clearTimeout(timeout);
+      abort.abort();
     };
   }, [client, fingerprint, valid, retry]);
   const current = quote?.key === fingerprint && valid ? quote.value : undefined;
@@ -380,9 +386,12 @@ export function Composer({
                       </button>
                     </div>
                     {d.book.chapters.map((c) => (
-                      <label className="checkbox" key={c.id}>
+                      <label className="checkbox chapter-row" key={c.id}>
                         <input
                           type="checkbox"
+                          // The label now carries a size beside the title, so the
+                          // control names itself rather than reading both out.
+                          aria-label={c.title}
                           checked={d.chapters.includes(c.id)}
                           onChange={(e) =>
                             update({
@@ -398,7 +407,20 @@ export function Composer({
                             })
                           }
                         />
-                        {c.title}
+                        <span className="chapter-name">{c.title}</span>
+                        {chapterSummary(c.speechCharacters, narration) && (
+                          <small
+                            className={
+                              isLongChapter(c.speechCharacters, narration)
+                                ? "chapter-meta long"
+                                : "chapter-meta"
+                            }
+                          >
+                            {chapterSummary(c.speechCharacters, narration)}
+                            {isLongChapter(c.speechCharacters, narration) &&
+                              " · unusually long"}
+                          </small>
+                        )}
                       </label>
                     ))}
                   </div>

@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app";
+import { KenkuiApiError } from "../src/api/errors";
 import { fakeHost } from "./fakes/host";
 import {
   requestFor,
@@ -36,8 +37,8 @@ function makeClient<T extends object = {}>(extra: T = {} as T) {
       title: "Book",
       author: "Author",
       chapters: [
-        { id: "stable-chapter", title: "Chapter one" },
-        { id: "second", title: "Chapter two" },
+        { id: "stable-chapter", title: "Chapter one", speechCharacters: 42_000 },
+        { id: "second", title: "Chapter two", speechCharacters: 500_000 },
       ],
     }),
     voices: vi.fn().mockResolvedValue({
@@ -272,7 +273,7 @@ describe("server quotes and billing", () => {
     );
     await waitFor(() => expect(client.createJob).toHaveBeenCalledOnce());
   });
-  it("invalidates the displayed quote immediately on setting change and ignores late results", async () => {
+  it("invalidates the displayed quote immediately on setting change, abandons it, and ignores late results", async () => {
     let oldResolve: (v: unknown) => void = () => {};
     const client = makeClient({
       capabilities: vi.fn().mockResolvedValue(priced),
@@ -298,6 +299,7 @@ describe("server quotes and billing", () => {
     fireEvent.click(screen.getByText("Advanced", { exact: true }));
     fireEvent.click(screen.getByLabelText("Chapter two"));
     await screen.findByText("50 credits");
+    expect(client.preflight.mock.calls[0][1].aborted).toBe(true);
     await act(async () =>
       oldResolve({
         sourceId: "asset-1",
@@ -309,6 +311,27 @@ describe("server quotes and billing", () => {
     );
     expect(screen.queryByText("100 credits")).toBeNull();
     expect(screen.getByText("50 credits")).toBeVisible();
+  });
+  it("sizes every chapter and flags the unusually long one", async () => {
+    const client = makeClient({
+      capabilities: vi.fn().mockResolvedValue({
+        ...capabilities,
+        narration: { charactersPerSecond: 13, longChapterHours: 6 },
+      }),
+    });
+    render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    fireEvent.click(screen.getByText("Advanced", { exact: true }));
+
+    // 42,000 characters at 13 per second is under an hour; 500,000 is over ten.
+    await screen.findByText("42,000 characters · about 54 min");
+    const long = screen.getByText(
+      "500,000 characters · about 10 h 41 m · unusually long",
+    );
+    expect(long).toBeVisible();
+    expect(long.className).toContain("long");
+    // Naming the input keeps the control readable beside its size.
+    expect(screen.getByLabelText("Chapter two")).toBeChecked();
   });
   it("does not fetch billing on an unmetered server", async () => {
     const client = makeClient();

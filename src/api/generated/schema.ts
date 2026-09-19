@@ -413,6 +413,13 @@ export interface components {
              */
             covers?: components["schemas"]["CoverCapabilities"];
             /**
+             * @default {
+             *       "charactersPerSecond": 13,
+             *       "longChapterHours": 6
+             *     }
+             */
+            narration?: components["schemas"]["NarrationCapabilities"];
+            /**
              * Pauselengths
              * @default true
              */
@@ -638,6 +645,26 @@ export interface components {
              */
             status: "queued" | "running" | "cancel_requested" | "succeeded" | "failed" | "cancelled";
             progress: components["schemas"]["ProgressResponse"];
+        };
+        /**
+         * NarrationCapabilities
+         * @description How this server's renderer turns text into time.
+         *
+         *     Published so a browser can show what a chapter will cost before anyone
+         *     submits it, using the same numbers the renderer reports against rather than
+         *     a copy that can drift from them.
+         */
+        NarrationCapabilities: {
+            /**
+             * Characterspersecond
+             * @default 13
+             */
+            charactersPerSecond?: number;
+            /**
+             * Longchapterhours
+             * @default 6
+             */
+            longChapterHours?: number;
         };
         /** OutputRequest */
         OutputRequest: {

@@ -109,8 +109,11 @@ export class KenkuiServerClient {
   async inspectBook(assetId: string): Promise<BookResponse> {
     return this.json(`/v1/assets/${encodeURIComponent(assetId)}/book`);
   }
-  async preflight(payload: JobRequest): Promise<PreflightResponse> {
-    return this.json("/v1/jobs/preflight", this.jsonBody(payload));
+  async preflight(
+    payload: JobRequest,
+    signal?: AbortSignal,
+  ): Promise<PreflightResponse> {
+    return this.json("/v1/jobs/preflight", { ...this.jsonBody(payload), signal });
   }
   async jobs(): Promise<JobListResponse> {
     return this.json("/v1/jobs");
