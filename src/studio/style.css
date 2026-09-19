@@ -12,6 +12,7 @@
   --subtle: #2b2520;
   --badge: #171d18;
   --overlay: #0b0908b8;
+  --warning: #e0b264;
   color: var(--ink);
   background: var(--bg);
   font-synthesis: none;
@@ -30,6 +31,7 @@
   --button-ink: #fffaf0;
   --subtle: #ede7dc;
   --overlay: #29201575;
+  --warning: #8a5a10;
 }
 @media (prefers-color-scheme: light) {
   :root[data-theme="system"] {
@@ -44,6 +46,7 @@
     --button-ink: #fffaf0;
     --subtle: #ede7dc;
     --overlay: #29201575;
+    --warning: #8a5a10;
   }
 }
 * {
@@ -1970,6 +1973,23 @@ a {
 .chapter-selection .checkbox {
   padding: 10px 0;
   font-size: 13px;
+}
+.chapter-row {
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.chapter-name {
+  flex: 1 1 auto;
+}
+.chapter-meta {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.chapter-meta.long {
+  color: var(--warning);
 }
 .voice-attribution {
   margin: 18px 0 0;
