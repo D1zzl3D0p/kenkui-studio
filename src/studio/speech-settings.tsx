@@ -1,4 +1,4 @@
-import { validPauseLength, type PauseLengths, type SpeechSettings } from "./store";
+import { pauseFieldsFor, validPauseLength, type PauseLengths, type SettingsSupport, type SpeechSettings } from "./store";
 
 // Drafts created before these options existed retain their original behavior.
 export const legacySpeechSettings: SpeechSettings = {
@@ -57,18 +57,21 @@ export function SpeechReview({ value = legacySpeechSettings, showChapterToggle =
 }
 
 
-const pauseFields = [
-  ["chapterPauseMs", "Between chapters"],
-  ["headingBeforePauseMs", "Before headings"],
-  ["headingAfterPauseMs", "After headings"],
-  ["paragraphPauseMs", "Between paragraphs"],
-  ["linePauseMs", "Between lines"],
-] as const;
+const pauseLabels: Record<keyof PauseLengths, string> = {
+  chapterPauseMs: "Between chapters",
+  scenePauseMs: "Between scenes",
+  headingBeforePauseMs: "Before headings",
+  headingAfterPauseMs: "After headings",
+  paragraphPauseMs: "Between paragraphs",
+  linePauseMs: "Between lines",
+};
 
-export function PauseControls({ value, onChange }: {
+export function PauseControls({ value, onChange, support }: {
   value: PauseLengths;
   onChange(value: PauseLengths): void;
+  support: SettingsSupport;
 }) {
+  const pauseFields = pauseFieldsFor(support).map((key) => [key, pauseLabels[key]] as const);
   const invalid = pauseFields.some(([key]) => !validPauseLength(value[key]));
   return <details data-settings-id="pause-lengths">
     <summary>Pacing · {invalid ? "Check pause lengths" : `${Number(value.chapterPauseMs)} ms between chapters`}</summary>
@@ -76,6 +79,10 @@ export function PauseControls({ value, onChange }: {
       Enter whole milliseconds from 0 to 60,000. Use 0 for no added pause.
       When boundaries overlap, the longest pause applies. No extra silence is added at the end of the book.
     </p>
+    {support.scenePauses && <p className="quiet">
+      A scene break is the divider inside a chapter — a rule, or a line such as * * *.
+      Books that mark their scene changes some other way have none to find.
+    </p>}
     <div className="settings-grid">
       {pauseFields.map(([key, label]) => {
         const valid = validPauseLength(value[key]);
@@ -100,10 +107,11 @@ export function PauseControls({ value, onChange }: {
   </details>;
 }
 
-export function PauseReview({ value }: { value: PauseLengths }) {
+export function PauseReview({ value, support }: { value: PauseLengths; support: SettingsSupport }) {
   return <dl className="review" aria-label="Pause lengths">
-    {pauseFields.map(([key, label]) => <div key={key}>
-      <dt>{label}</dt><dd>{Number(value[key]) === 0 ? "Off" : `${Number(value[key])} ms`}</dd>
+    {pauseFieldsFor(support).map((key) => <div key={key}>
+      <dt>{pauseLabels[key]}</dt>
+      <dd>{Number(value[key]) === 0 ? "Off" : `${Number(value[key])} ms`}</dd>
     </div>)}
   </dl>;
 }

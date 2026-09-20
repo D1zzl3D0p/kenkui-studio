@@ -47,6 +47,7 @@ test("uploads a cover, resumes a draft, and downloads a completed book", async (
   await page.getByText("Pacing · 1500 ms between chapters", { exact: true }).click();
   await expect(page.getByLabel("Between chapters (ms)")).toHaveValue("1500");
   await page.getByLabel("Between chapters (ms)").fill("2200");
+  await page.getByLabel("Between scenes (ms)").fill("900");
   await page.getByLabel("Before headings (ms)").fill("150");
   await page.getByLabel("After headings (ms)").fill("600");
   await page.getByLabel("Between paragraphs (ms)").fill("250");
@@ -62,7 +63,7 @@ test("uploads a cover, resumes a draft, and downloads a completed book", async (
   await expect(
     page.getByRole("heading", { name: "Your audiobook is ready" }),
   ).toBeVisible();
-  expect(submittedTts).toEqual({ normalizeText: true, chapterPauses: true, prepareNumbers: true, pronunciationCorrections: true, stutterHandling: true, chapterPauseMs: 2200, headingBeforePauseMs: 150, headingAfterPauseMs: 600, paragraphPauseMs: 250, linePauseMs: 100 });
+  expect(submittedTts).toEqual({ normalizeText: true, chapterPauses: true, prepareNumbers: true, pronunciationCorrections: true, stutterHandling: true, chapterPauseMs: 2200, scenePauseMs: 900, headingBeforePauseMs: 150, headingAfterPauseMs: 600, paragraphPauseMs: 250, linePauseMs: 100 });
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download M4B" }).click();
   expect((await downloadPromise).suggestedFilename()).toBe("My audiobook.m4b");

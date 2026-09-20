@@ -8,17 +8,35 @@ export const defaultSpeechSettings = {
 export type SpeechSettings = typeof defaultSpeechSettings;
 export const defaultPauseLengths = {
   chapterPauseMs: "1500",
+  scenePauseMs: "0",
   headingBeforePauseMs: "0",
   headingAfterPauseMs: "0",
   paragraphPauseMs: "0",
   linePauseMs: "0",
 };
 export type PauseLengths = typeof defaultPauseLengths;
+/** Which of these a server will actually apply. Absent means an older server. */
+export type SettingsSupport = {
+  speechSettings?: boolean;
+  pauseLengths?: boolean;
+  scenePauses?: boolean;
+};
+const everySetting: SettingsSupport = {
+  speechSettings: true,
+  pauseLengths: true,
+  scenePauses: true,
+};
+/** Tiers this draft may send, in the order a reader meets them. */
+export function pauseFieldsFor(support: SettingsSupport): (keyof PauseLengths)[] {
+  const keys = Object.keys(defaultPauseLengths) as (keyof PauseLengths)[];
+  return support.scenePauses ? keys : keys.filter((key) => key !== "scenePauseMs");
+}
 export function validPauseLength(value: string): boolean {
   return /^\d+$/.test(value.trim()) && Number(value) <= 60_000;
 }
 export function pauseLengthsFor(d: Pick<Draft, "pauseLengths" | "speechSettings">): PauseLengths {
-  return d.pauseLengths ?? {
+  if (d.pauseLengths) return { ...defaultPauseLengths, ...d.pauseLengths };
+  return {
     ...defaultPauseLengths,
     chapterPauseMs: d.speechSettings?.chapterPauses ? "1500" : "0",
   };
@@ -55,7 +73,9 @@ export type Library = { drafts: Draft[]; records: Record[] };
 export const uid = () =>
   globalThis.crypto?.randomUUID?.() ??
   `studio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-export function requestFor(d: Draft, supportsSpeechSettings = true, supportsPauseLengths = true): JobRequest {
+export function requestFor(d: Draft, support: SettingsSupport = everySetting): JobRequest {
+  const pauseLengths = d.pauseLengths && pauseLengthsFor(d);
+  const fields = pauseFieldsFor(support);
   return {
     sourceId: d.book.sourceId,
     chapters: d.chapters,
@@ -70,10 +90,10 @@ export function requestFor(d: Draft, supportsSpeechSettings = true, supportsPaus
           },
     tts: {
       normalizeText: true,
-      ...(supportsSpeechSettings ? d.speechSettings : undefined),
-      ...(supportsPauseLengths && d.pauseLengths &&
-        Object.values(d.pauseLengths).every(validPauseLength)
-        ? Object.fromEntries(Object.entries(d.pauseLengths).map(([key, value]) => [key, Number(value)]))
+      ...(support.speechSettings ? d.speechSettings : undefined),
+      ...(support.pauseLengths && pauseLengths &&
+        fields.every((key) => validPauseLength(pauseLengths[key]))
+        ? Object.fromEntries(fields.map((key) => [key, Number(pauseLengths[key])]))
         : {}),
     },
     output: {
@@ -113,9 +133,10 @@ export function readLibrary(key: string): Library {
           typeof d.unknown === "string" &&
           typeof d.originalSourceId === "string" &&
           (d.pauseLengths === undefined ||
-            (d.pauseLengths !== null && Object.keys(defaultPauseLengths).every(
-              (key) => typeof d.pauseLengths?.[key as keyof PauseLengths] === "string",
-            ))) &&
+            (typeof d.pauseLengths === "object" && d.pauseLengths !== null &&
+              Object.values(d.pauseLengths).every(
+                (value) => typeof value === "string",
+              ))) &&
           (d.speechSettings === undefined ||
             (d.speechSettings !== null &&
               Object.keys(defaultSpeechSettings).every(
