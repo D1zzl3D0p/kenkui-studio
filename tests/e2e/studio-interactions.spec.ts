@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { patchCapabilities } from "./capabilities";
 
 test("dropping an EPUB opens its draft and settings remain open when revisited", async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 720 });
@@ -36,10 +37,7 @@ test("dropping an EPUB opens its draft and settings remain open when revisited",
 });
 
 test("expired sessions replace the whole studio and sign-in goes directly to AuthKit", async ({ page }) => {
-  await page.route("**/v1/capabilities", async route => {
-    const response = await route.fetch();
-    await route.fulfill({ json: { ...await response.json(), auth: { mode: "session" }, billing: { mode: "credits" } } });
-  });
+  await patchCapabilities(page, { auth: { mode: "session" }, billing: { mode: "credits" } });
   await page.route("**/v1/auth/session", route => route.fulfill({ json: { userId: "reader" } }));
   await page.route("**/v1/billing", route => route.fulfill({ json: { availableCredits: "500", checkoutEnabled: "true" } }));
   await page.goto("/");

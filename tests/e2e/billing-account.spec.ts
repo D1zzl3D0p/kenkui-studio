@@ -1,13 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { patchCapabilities } from "./capabilities";
 
 test("mobile billing shows pack details, refreshes history, and opens checkout", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.route("**/v1/capabilities", async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({ json: {
-      ...await response.json(), auth: { mode: "session" }, billing: { mode: "credits" },
-    } });
-  });
+  await patchCapabilities(page, { auth: { mode: "session" }, billing: { mode: "credits" } });
   await page.route("**/v1/auth/session", (route) => route.fulfill({ json: { userId: "billing-reader" } }));
   let balance = "300";
   await page.route("**/v1/billing", (route) => route.fulfill({ json: {
