@@ -696,6 +696,44 @@ describe("pacing and speech preparation", () => {
     expect(client.preflight).toHaveBeenLastCalledWith(payload);
   });
 
+  it("offers the scene tier only where the server applies it, and sends what it shows", async () => {
+    const client = makeClient({
+      capabilities: vi.fn().mockResolvedValue({
+        ...capabilities, speechSettings: true, pauseLengths: true, scenePauses: true,
+      }),
+    });
+    render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "Narration" });
+    expect(screen.getByLabelText("Between scenes (ms)")).toHaveValue("0");
+    fireEvent.change(screen.getByLabelText("Between scenes (ms)"), { target: { value: "900" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Create audiobook" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Create audiobook" }));
+    await screen.findByRole("heading", { name: "Creating your audiobook" });
+    expect(client.createJob.mock.calls[0][0].tts.scenePauseMs).toBe(900);
+  });
+
+  it("hides the scene tier on a server that would ignore it", async () => {
+    const client = makeClient({
+      capabilities: vi.fn().mockResolvedValue({
+        ...capabilities, speechSettings: true, pauseLengths: true,
+      }),
+    });
+    render(<App client={client as never} host={fakeHost()} />);
+    await upload();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "Narration" });
+    expect(screen.getByLabelText("Between chapters (ms)")).toHaveValue("1500");
+    expect(screen.queryByLabelText("Between scenes (ms)")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Create audiobook" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Create audiobook" }));
+    await screen.findByRole("heading", { name: "Creating your audiobook" });
+    expect(client.createJob.mock.calls[0][0].tts).not.toHaveProperty("scenePauseMs");
+  });
+
   it("does not offer new settings on older servers", async () => {
     render(<App client={makeClient() as never} host={fakeHost()} />);
     await upload();
@@ -706,6 +744,27 @@ describe("pacing and speech preparation", () => {
   });
 });
 
+
+it("keeps drafts saved before the scene tier existed", () => {
+  const saved = {
+    id: "draft", book: { sourceId: "source", title: "Book", author: "A", chapters: [] },
+    originalSourceId: "source", title: "Book", author: "A", chapters: ["c"],
+    narrator: "v", mode: "single", model: "", unknown: "", method: "gendered",
+    format: "m4b", sourceCover: true, step: 1, key: "same", updated: 1,
+    pauseLengths: {
+      chapterPauseMs: "1500", headingBeforePauseMs: "0", headingAfterPauseMs: "0",
+      paragraphPauseMs: "250", linePauseMs: "0",
+    },
+  };
+  localStorage.setItem("old", JSON.stringify({ drafts: [saved], records: [] }));
+  const [draft] = readLibrary("old").drafts;
+  expect(draft).toBeDefined();
+  expect(pauseLengthsFor(draft)).toEqual({
+    chapterPauseMs: "1500", scenePauseMs: "0", headingBeforePauseMs: "0",
+    headingAfterPauseMs: "0", paragraphPauseMs: "250", linePauseMs: "0",
+  });
+  expect(requestFor(draft).tts).toMatchObject({ chapterPauseMs: 1500, scenePauseMs: 0 });
+});
 
 it("preserves old chapter-pause choices when opening the duration fields", () => {
   expect(pauseLengthsFor({}).chapterPauseMs).toBe("0");

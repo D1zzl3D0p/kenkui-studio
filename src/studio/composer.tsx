@@ -9,7 +9,7 @@ import type {
 import { ErrorMessage } from "../components/error-message";
 import { BookCover } from "./cover";
 import { chapterSummary, isLongChapter, narrationOf } from "./estimates";
-import { requestFor, pauseLengthsFor, validPauseLength, type Draft } from "./store";
+import { requestFor, pauseFieldsFor, pauseLengthsFor, validPauseLength, type Draft } from "./store";
 import { VoicePicker, voiceInfo } from "./voice-picker";
 import { PauseControls, PauseReview, SpeechControls, SpeechReview } from "./speech-settings";
 
@@ -53,10 +53,15 @@ export function Composer({
   useEffect(() => {
     if (!d.narrator && voices[0]) update({ narrator: voices[0].id });
   }, [d.narrator, voices]);
-  const payload = useMemo(
-    () => requestFor(d, cap.speechSettings === true, cap.pauseLengths === true),
-    [d, cap.speechSettings, cap.pauseLengths],
+  const support = useMemo(
+    () => ({
+      speechSettings: cap.speechSettings === true,
+      pauseLengths: cap.pauseLengths === true,
+      scenePauses: cap.scenePauses === true,
+    }),
+    [cap.speechSettings, cap.pauseLengths, cap.scenePauses],
   );
+  const payload = useMemo(() => requestFor(d, support), [d, support]);
   const fingerprint = JSON.stringify(payload);
   const latest = useRef(fingerprint);
   latest.current = fingerprint;
@@ -66,7 +71,8 @@ export function Composer({
   const pauseLengths = pauseLengthsFor(d);
   const narration = narrationOf(cap);
   const valid = Boolean(
-    (!cap.pauseLengths || Object.values(pauseLengths).every(validPauseLength)) &&
+    (!cap.pauseLengths ||
+      pauseFieldsFor(support).every((key) => validPauseLength(pauseLengths[key]))) &&
     d.title.trim() &&
     d.chapters.length &&
     voices.some((v) => v.id === d.narrator) &&
@@ -588,7 +594,8 @@ export function Composer({
                   </details>
                 )}
                 {cap.pauseLengths && (
-                  <PauseControls value={pauseLengths} onChange={(pauseLengths) => update({ pauseLengths })} />
+                  <PauseControls value={pauseLengths} support={support}
+                    onChange={(pauseLengths) => update({ pauseLengths })} />
                 )}
                 {cap.speechSettings && (
                   <SpeechControls
@@ -646,10 +653,13 @@ export function Composer({
                     <dd>{d.format.toUpperCase()}</dd>
                   </div>
                 </dl>
-                {cap.pauseLengths && <PauseReview value={pauseLengths} />}
+                {cap.pauseLengths && <PauseReview value={pauseLengths} support={support} />}
                 {cap.speechSettings && <SpeechReview value={d.speechSettings} showChapterToggle={!cap.pauseLengths} />}
                 {!cap.pauseLengths && d.pauseLengths && (
                   <p role="status">This server cannot apply custom pause lengths.</p>
+                )}
+                {cap.pauseLengths && !cap.scenePauses && Number(pauseLengths.scenePauseMs) > 0 && (
+                  <p role="status">This server cannot pause at scene breaks. Its other pause lengths still apply.</p>
                 )}
                 {!cap.speechSettings && d.speechSettings && (
                   <p role="status">This server cannot apply the saved pacing and speech preparation settings.</p>
