@@ -425,6 +425,11 @@ export interface components {
              */
             pauseLengths?: boolean;
             /**
+             * Scenepauses
+             * @default true
+             */
+            scenePauses?: boolean;
+            /**
              * Speechsettings
              * @default true
              */
@@ -607,7 +612,8 @@ export interface components {
              *       "headingBeforePauseMs": 0,
              *       "headingAfterPauseMs": 0,
              *       "paragraphPauseMs": 0,
-             *       "linePauseMs": 0
+             *       "linePauseMs": 0,
+             *       "scenePauseMs": 0
              *     }
              */
             tts?: components["schemas"]["TtsRequest"];
@@ -760,6 +766,11 @@ export interface components {
              * @default 0
              */
             linePauseMs?: number;
+            /**
+             * Scenepausems
+             * @default 0
+             */
+            scenePauseMs?: number;
         };
         /** ValidationError */
         ValidationError: {
