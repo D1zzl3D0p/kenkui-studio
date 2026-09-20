@@ -2050,6 +2050,10 @@ a {
 .account-popover { position: absolute; z-index: 20; top: calc(100% + 12px); right: 0; width: 220px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 32px #0003; }
 .account-popover p { margin: 0 0 12px; }
 .account-popover .primary { display: block; text-align: center; text-decoration: none; }
+.notification-settings { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.notification-settings .secondary { margin-bottom: 0; }
+.notification-email { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.notification-email input { margin-top: 2px; flex: none; }
 .sign-in-panel { max-width: 420px; margin-bottom: 24px; }
 .sign-in-panel .primary { display: inline-block; margin-top: 12px; text-decoration: none; }
 .billing-page .balance-panel { margin-bottom: 28px; gap: 16px; }

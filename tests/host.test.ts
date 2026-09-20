@@ -70,3 +70,72 @@ describe("web host", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("web notifications", () => {
+  class FakeNotification {
+    static permission = "granted";
+    static requestPermission = vi.fn().mockResolvedValue("granted");
+    static shown: { title: string; options?: NotificationOptions }[] = [];
+    static last: FakeNotification | undefined;
+    onclick: (() => void) | null = null;
+    constructor(title: string, options?: NotificationOptions) {
+      FakeNotification.shown.push({ title, options });
+      FakeNotification.last = this;
+    }
+  }
+
+  type Navigate = ReturnType<typeof vi.fn<(url: string) => void>>;
+
+  const withNotification = async (permission: string, run: (navigate: Navigate) => Promise<void> | void) => {
+    FakeNotification.permission = permission;
+    FakeNotification.shown = [];
+    vi.stubGlobal("Notification", FakeNotification);
+    const navigate = vi.fn<(url: string) => void>();
+    try {
+      await run(navigate);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  };
+
+  it("is absent where the browser has no notification API", async () => {
+    vi.stubGlobal("Notification", undefined);
+    try {
+      expect((await createHost()).notifications).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("shows a notice that opens the book it announces", async () => {
+    await withNotification("granted", async (navigate) => {
+      const host = await createHost({ navigate });
+      await host.notifications?.show({ title: "Ready", body: "Done", path: "/jobs/a" });
+
+      expect(FakeNotification.shown).toEqual([
+        { title: "Ready", options: { body: "Done", tag: "/jobs/a" } },
+      ]);
+
+      // Activating the notice must take the reader to the book it announced.
+      FakeNotification.last?.onclick?.();
+      expect(navigate).toHaveBeenCalledWith("/jobs/a");
+    });
+  });
+
+  it("stays silent until permission is granted", async () => {
+    await withNotification("default", async (navigate) => {
+      const host = await createHost({ navigate });
+      await expect(host.notifications?.permission()).resolves.toBe("default");
+      await host.notifications?.show({ title: "Ready", body: "Done" });
+      expect(FakeNotification.shown).toEqual([]);
+    });
+  });
+
+  it("asks the browser when the reader opts in", async () => {
+    await withNotification("default", async () => {
+      const host = await createHost();
+      await expect(host.notifications?.request()).resolves.toBe("granted");
+      expect(FakeNotification.requestPermission).toHaveBeenCalled();
+    });
+  });
+});

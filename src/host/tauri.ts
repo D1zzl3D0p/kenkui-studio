@@ -4,7 +4,18 @@ import { platform as osPlatform } from "@tauri-apps/plugin-os";
 import { load } from "@tauri-apps/plugin-store";
 import { save } from "@tauri-apps/plugin-dialog";
 import { openUrl as openExternalUrl } from "@tauri-apps/plugin-opener";
-import type { Host, HostCapabilities, SaveArtifactOptions } from "./index";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
+import type {
+  Host,
+  HostCapabilities,
+  Notifications,
+  NoticePermission,
+  SaveArtifactOptions,
+} from "./index";
 import { createServerRegistry } from "./native-registry";
 import { createNativeAuth } from "./native-auth";
 import { channelEventSourceFactory, type EventChannel, type EventFrame } from "./channel-event-source";
@@ -127,6 +138,22 @@ export function downloadArtifact(invoke: Invoke, url: string, path: string | und
   });
 }
 
+/**
+ * Native notifications. The platform reports only whether permission is held,
+ * so an undecided reader and a refusing one are both reported as "default";
+ * asking again is harmless and the OS answers from its own record.
+ */
+export function nativeNotifications(): Notifications {
+  return {
+    permission: async () => ((await isPermissionGranted()) ? "granted" : "default"),
+    request: async () => (await requestPermission()) as NoticePermission,
+    show: async ({ title, body }) => {
+      if (!(await isPermissionGranted())) return;
+      sendNotification({ title, body });
+    },
+  };
+}
+
 export async function createHost(): Promise<Host> {
   const invoke = tauriInvoke as unknown as Invoke;
   const platform = await osPlatform();
@@ -136,6 +163,7 @@ export async function createHost(): Promise<Host> {
     platform: can.reachLoopback ? "desktop" : "mobile",
     can,
     auth: createNativeAuth(invoke),
+    notifications: nativeNotifications(),
     transport: (baseUrl) => ({
       fetch: nativeFetch(invoke, baseUrl),
       eventSource: channelEventSourceFactory(openEventChannel(invoke)),

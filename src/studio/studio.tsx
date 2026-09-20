@@ -13,6 +13,7 @@ import { ServersPage } from "../pages/servers";
 import { Composer } from "./composer";
 import { BookCover } from "./cover";
 import { JobView, statusLabel } from "./job-view";
+import { useCompletionNotices } from "./completion-notices";
 import {
   changeDraft,
   defaultSpeechSettings,
@@ -273,6 +274,9 @@ export function Studio({
       : undefined;
   const recordFor = (job: JobResponse) =>
     library.records.find((r) => r.id === job.id);
+  useCompletionNotices(jobs, host, (id) =>
+    library.records.find((r) => r.id === id)?.title,
+  );
   const metadata = (job: JobResponse) => {
     const r = recordFor(job);
     return {
@@ -334,7 +338,7 @@ export function Studio({
             </select>
           </label>
           {cap.auth?.mode && cap.auth.mode !== "none" && (
-            <AccountMenu client={client} signedIn auth={host.auth} initiallyOpen={path === "/sign-in"} />
+            <AccountMenu client={client} signedIn auth={host.auth} host={host} capabilities={cap} initiallyOpen={path === "/sign-in"} />
           )}
         </nav>
       </header>

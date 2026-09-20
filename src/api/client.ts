@@ -13,6 +13,7 @@ import type {
   JobListResponse,
   JobRequest,
   JobResponse,
+  NotificationPreferenceResponse,
   PreflightResponse,
   VoiceListResponse,
 } from "./generated/v1";
@@ -89,6 +90,17 @@ export class KenkuiServerClient {
   }
   async checkout(credits: number): Promise<{ url: string }> {
     return this.json("/v1/billing/checkout", this.jsonBody({ credits }));
+  }
+  async notificationPreference(): Promise<NotificationPreferenceResponse> {
+    return this.json("/v1/notifications");
+  }
+  async setNotificationPreference(
+    emailOnCompletion: boolean,
+  ): Promise<NotificationPreferenceResponse> {
+    return this.json("/v1/notifications", {
+      ...this.jsonBody({ emailOnCompletion }),
+      method: "PATCH",
+    });
   }
   async voices(): Promise<VoiceListResponse> {
     return this.json("/v1/voices");

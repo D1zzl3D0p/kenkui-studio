@@ -21,3 +21,5 @@ export type Capabilities = components["schemas"]["Capabilities"];
 export type JobStatus = JobResponse["status"];
 export type BillingResponse = components["schemas"]["BillingResponse"];
 export type CreditHistoryResponse = components["schemas"]["CreditHistoryResponse"];
+export type NotificationPreferenceResponse =
+  components["schemas"]["NotificationPreferenceResponse"];
