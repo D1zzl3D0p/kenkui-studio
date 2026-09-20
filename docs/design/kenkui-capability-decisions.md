@@ -8,7 +8,7 @@ The approved first slice implements chapter pauses (1.5 seconds, on), conservati
 
 ### Follow-up: editable pause lengths
 
-The user subsequently requested text entry for every supported structural pause. Studio now replaces the chapter toggle with millisecond fields: between chapters, between scenes, before headings, after headings, between paragraphs, and between lines. New drafts start at 1500 for chapters and zero for every other tier. Each value must be a whole number from 0 to 60,000; zero disables the added pause. The API advertises `pauseLengths`, accepts explicit durations, and preserves the legacy chapter toggle when no explicit chapter duration exists. The scene tier arrived later and is advertised separately as `scenePauses`, because request models ignore fields they do not know: a server without it would accept a scene duration and render without one. Speech preparation remains unchanged. This supersedes the toggle-only pacing recommendations below.
+The user subsequently requested text entry for every supported structural pause. Studio now replaces the chapter toggle with millisecond fields: between chapters, between scenes, before headings, after headings, between paragraphs, and between lines. New drafts start at 1500 for chapters, 1000 for scenes, and zero for every other tier. An existing draft keeps what it stored: a tier it never held reads as off rather than adopting a later default. Each value must be a whole number from 0 to 60,000; zero disables the added pause. The API advertises `pauseLengths`, accepts explicit durations, and preserves the legacy chapter toggle when no explicit chapter duration exists. The scene tier arrived later and is advertised separately as `scenePauses`, because request models ignore fields they do not know: a server without it would accept a scene duration and render without one. Speech preparation remains unchanged. This supersedes the toggle-only pacing recommendations below.
 
 ## Decision rules
 
@@ -38,7 +38,7 @@ The 1.5-second value is a listening-test starting point, not a verified optimum.
 | `heading_before_ms` | Hidden, off | 0 | Chapter separation already handles many title boundaries; avoid another setting initially. |
 | `paragraph_ms` | Toggle, off | “Extra pause between paragraphs”; on = 250 ms | Helpful for some material, but uniform extra silence may make dialogue drag. |
 | `line_ms` | Hidden, off | 0 | Source line boundaries need not represent intended listening breaks. |
-| `scene_ms` | Field, 0 | Mid-chapter scene break; off until a reader sets it | Kenkui 10.1 detects the break; no duration has been auditioned, and a non-zero default would re-segment every new book. |
+| `scene_ms` | Field, 1000 | Mid-chapter scene break; 1000 ms on a new draft | Kenkui 10.1 detects the break. The duration is a starting point rather than an audition result; because the paragraph tier defaults off, this default does move the segment boundary on new books. |
 | `silence(duration_ms, where=...)` | Hidden | No manual per-passage silence editor | Requires selecting and reviewing actual passages, not just a switch. A scene pause is a structural tier and is not this. |
 
 The chapter switch controls inserted chapter gaps, not all silence from heading policy or the voice engine. Copy should say “Adds a 1.5-second gap between chapters.”

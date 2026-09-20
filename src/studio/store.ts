@@ -6,9 +6,10 @@ export const defaultSpeechSettings = {
   stutterHandling: false,
 };
 export type SpeechSettings = typeof defaultSpeechSettings;
+/** What a new draft starts with. An existing draft keeps what it stored. */
 export const defaultPauseLengths = {
   chapterPauseMs: "1500",
-  scenePauseMs: "0",
+  scenePauseMs: "1000",
   headingBeforePauseMs: "0",
   headingAfterPauseMs: "0",
   paragraphPauseMs: "0",
@@ -34,10 +35,16 @@ export function pauseFieldsFor(support: SettingsSupport): (keyof PauseLengths)[]
 export function validPauseLength(value: string): boolean {
   return /^\d+$/.test(value.trim()) && Number(value) <= 60_000;
 }
+// A tier a draft never stored was never chosen for it, so it reads as off.
+// Filling from the new-draft defaults would hand old work a pause it never
+// asked for, and the draft would render differently than when it was saved.
+const noPauses = Object.fromEntries(
+  Object.keys(defaultPauseLengths).map((key) => [key, "0"]),
+) as PauseLengths;
 export function pauseLengthsFor(d: Pick<Draft, "pauseLengths" | "speechSettings">): PauseLengths {
-  if (d.pauseLengths) return { ...defaultPauseLengths, ...d.pauseLengths };
+  if (d.pauseLengths) return { ...noPauses, ...d.pauseLengths };
   return {
-    ...defaultPauseLengths,
+    ...noPauses,
     chapterPauseMs: d.speechSettings?.chapterPauses ? "1500" : "0",
   };
 }
