@@ -28,6 +28,10 @@ the following native checks still require a configured desktop:
 - [ ] Switching servers does not attach Cloud credentials to a LAN server.
 - [ ] Sign-out clears native credentials even offline; locked credential storage
   reports an error without falling back to plaintext.
+- [ ] The account menu offers notification permission, and the OS prompt appears
+  once; a refusal leaves the studio usable.
+- [ ] A book finishing while the window is backgrounded raises a system
+  notification naming that book.
 
 The implementation environment lacked Rust and Linux WebView dependencies, so
 these native checks are not marked as passing.

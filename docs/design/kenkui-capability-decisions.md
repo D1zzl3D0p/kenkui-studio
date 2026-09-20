@@ -10,6 +10,26 @@ The approved first slice implements chapter pauses (1.5 seconds, on), conservati
 
 The user subsequently requested text entry for every supported structural pause. Studio now replaces the chapter toggle with millisecond fields: between chapters, between scenes, before headings, after headings, between paragraphs, and between lines. New drafts start at 1500 for chapters, 1000 for scenes, and zero for every other tier. An existing draft keeps what it stored: a tier it never held reads as off rather than adopting a later default. Each value must be a whole number from 0 to 60,000; zero disables the added pause. The API advertises `pauseLengths`, accepts explicit durations, and preserves the legacy chapter toggle when no explicit chapter duration exists. The scene tier arrived later and is advertised separately as `scenePauses`, because request models ignore fields they do not know: a server without it would accept a scene duration and render without one. Speech preparation remains unchanged. This supersedes the toggle-only pacing recommendations below.
 
+### Follow-up: completion notifications
+
+A long book can take hours, so the studio no longer requires watching it finish.
+Two independent channels announce a completed book, each offered only where it
+can work. A system notification is raised by the host — the browser's
+Notification API, or the Tauri notification plugin — whenever the studio is open
+on any page, because the shell already polls every job. Email is sent by the
+hosted worker at the point a completion commits, and only where a deployment has
+configured mail; a server without it advertises no email capability and no
+client shows the switch.
+
+Only success notifies. A cancellation is the reader's own action, and a failure
+is already surfaced in the job view; neither earns an interruption in this
+iteration. Notifications announce the book, never its content.
+
+Email is on by default for a signed-in hosted reader, since a completed job is
+mail they asked for by submitting it, and every message carries both a visible
+and a `List-Unsubscribe` link. Device notifications are off until the reader
+asks, because browsers and operating systems require an explicit grant.
+
 ## Decision rules
 
 - **Automatic**: Studio/server handles this with a defined policy; no new setting.

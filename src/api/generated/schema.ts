@@ -263,6 +263,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preference */
+        get: operations["preference_v1_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set Preference */
+        patch: operations["set_preference_v1_notifications_patch"];
+        trace?: never;
+    };
     "/v1/health": {
         parameters: {
             query?: never;
@@ -419,6 +437,12 @@ export interface components {
              *     }
              */
             narration?: components["schemas"]["NarrationCapabilities"];
+            /**
+             * @default {
+             *       "email": false
+             *     }
+             */
+            notifications?: components["schemas"]["NotificationCapabilities"];
             /**
              * Pauselengths
              * @default true
@@ -671,6 +695,38 @@ export interface components {
              * @default 6
              */
             longChapterHours?: number;
+        };
+        /**
+         * NotificationCapabilities
+         * @description How this server can tell a reader their book finished.
+         *
+         *     Advertised so a client offers an email preference only where mail is
+         *     actually configured, rather than a switch that silently does nothing.
+         */
+        NotificationCapabilities: {
+            /**
+             * Email
+             * @default false
+             */
+            email?: boolean;
+        };
+        /** NotificationPreferenceRequest */
+        NotificationPreferenceRequest: {
+            /** Emailoncompletion */
+            emailOnCompletion: boolean;
+        };
+        /**
+         * NotificationPreferenceResponse
+         * @description What completion mail would do for the signed-in reader right now.
+         */
+        NotificationPreferenceResponse: {
+            /** Email */
+            email?: string | null;
+            /**
+             * Emailoncompletion
+             * @default false
+             */
+            emailOnCompletion?: boolean;
         };
         /** OutputRequest */
         OutputRequest: {
@@ -1230,6 +1286,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preference_v1_notifications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferenceResponse"];
+                };
+            };
+        };
+    };
+    set_preference_v1_notifications_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationPreferenceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferenceResponse"];
                 };
             };
             /** @description Validation Error */

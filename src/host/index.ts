@@ -23,6 +23,27 @@ export interface SaveArtifactOptions {
   onProgress?(progress: { received: number; total?: number | null; phase?: "sharing" }): void;
 }
 
+/** A message the host shows outside the app, when the app may not be in view. */
+export interface Notice {
+  title: string;
+  body: string;
+  /** In-app location to open when the reader activates the notification. */
+  path?: string;
+}
+
+export type NoticePermission = "granted" | "denied" | "default";
+
+export interface Notifications {
+  permission(): Promise<NoticePermission>;
+  /**
+   * Browsers only grant this from a user gesture, so call it from a click
+   * rather than on load. Resolves to the decision, including a refusal.
+   */
+  request(): Promise<NoticePermission>;
+  /** Silently does nothing when permission was never granted. */
+  show(notice: Notice): Promise<void>;
+}
+
 export interface ServerEntry {
   id: string;
   label: string;
@@ -48,6 +69,8 @@ export interface Host {
   /** baseUrl scopes credential attachment, so a Cloud token never reaches a LAN server. */
   transport(baseUrl: string): ClientDependencies;
   readonly servers: ServerRegistry;
+  /** System notifications. Absent where the platform offers none. */
+  readonly notifications?: Notifications;
   /** Native-owned authentication. Absent for browser cookie sessions. */
   readonly auth?: {
     restore(origin: string): Promise<void>;
