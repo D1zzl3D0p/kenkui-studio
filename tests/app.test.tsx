@@ -12,6 +12,7 @@ import { fakeHost } from "./fakes/host";
 import {
   requestFor,
   pauseLengthsFor,
+  defaultPauseLengths,
   defaultSpeechSettings,
   changeDraft,
   readLibrary,
@@ -706,7 +707,7 @@ describe("pacing and speech preparation", () => {
     await upload();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByRole("heading", { name: "Narration" });
-    expect(screen.getByLabelText("Between scenes (ms)")).toHaveValue("0");
+    expect(screen.getByLabelText("Between scenes (ms)")).toHaveValue("1000");
     fireEvent.change(screen.getByLabelText("Between scenes (ms)"), { target: { value: "900" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Create audiobook" })).toBeEnabled());
@@ -764,6 +765,7 @@ it("keeps drafts saved before the scene tier existed", () => {
     headingAfterPauseMs: "0", paragraphPauseMs: "250", linePauseMs: "0",
   });
   expect(requestFor(draft).tts).toMatchObject({ chapterPauseMs: 1500, scenePauseMs: 0 });
+  expect(defaultPauseLengths.scenePauseMs).toBe("1000");
 });
 
 it("preserves old chapter-pause choices when opening the duration fields", () => {
