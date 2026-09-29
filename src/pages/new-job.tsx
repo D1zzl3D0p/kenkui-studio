@@ -23,6 +23,7 @@ export function NewJobPage({ client, capabilities, onCreated }: NewJobPageProps)
   const [casting_, setCasting] = useState<CastingValue>({});
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
+  const [speakChapterTitles, setSpeakChapterTitles] = useState(true);
   const [sourceCover, setSourceCover] = useState(true);
   const [busy, setBusy] = useState(false);
   const [format, setFormat] = useState<string>(capabilities.outputFormats?.[0] ?? "m4b");
@@ -40,7 +41,7 @@ export function NewJobPage({ client, capabilities, onCreated }: NewJobPageProps)
     ? { narratorVoiceId: casting_.narratorVoiceId ?? voiceId, unknownVoiceId: casting_.unknownVoiceId, method: casting_.method ?? "gendered", modelId: characterModel }
     : { voiceId: voiceId! };
   const chosen = () => characterModel ? (casting_.narratorVoiceId ?? voiceId) : voiceId;
-  const payload = (): JobRequest | undefined => book && chosen() ? { sourceId: book.sourceId, chapters, casting: casting(), tts: { normalizeText: true }, output: { format, title: title.trim() || null, author: author.trim() || null, sourceCover } } : undefined;
+  const payload = (): JobRequest | undefined => book && chosen() ? { sourceId: book.sourceId, chapters, casting: casting(), tts: { normalizeText: true, ...(capabilities.spokenChapterTitles ? { speakChapterTitles } : {}) }, output: { format, title: title.trim() || null, author: author.trim() || null, sourceCover } } : undefined;
   const inspect = async () => {
     if (!file) { setError(new Error("Choose an EPUB source first.")); return; }
     if (busy) return;
@@ -71,7 +72,7 @@ export function NewJobPage({ client, capabilities, onCreated }: NewJobPageProps)
     {step === 0 && <section><h2>Source</h2><FileUpload file={file} formats={capabilities.sourceFormats ?? ["epub"]} onChange={setFile} /><button type="button" onClick={inspect}>Inspect source</button></section>}
     {step === 1 && <section><h2>Chapters</h2>{book && <ChapterSelection chapters={book.chapters} selected={chapters} onChange={setChapters} capabilities={capabilities} />}<button type="button" onClick={() => setStep(2)} disabled={chapters.length === 0}>Continue to casting</button></section>}
     {step === 2 && <section><h2>Casting</h2><Casting modes={capabilities.casting?.modes ?? ["single"]} models={capabilities.casting?.models} voices={voices} value={casting_} onChange={setCasting} />{!capabilities.casting?.modes?.includes("characters") && <VoiceSelect voices={voices} selected={voiceId} onChange={setVoiceId} />}<button type="button" onClick={() => setStep(3)} disabled={!chosen()}>Continue to synthesis</button></section>}
-    {step === 3 && <section><h2>Synthesis</h2><TtsSettings /><button type="button" onClick={() => setStep(4)}>Continue to output</button></section>}
+    {step === 3 && <section><h2>Synthesis</h2><TtsSettings />{capabilities.spokenChapterTitles && <label><input type="checkbox" checked={speakChapterTitles} onChange={event => setSpeakChapterTitles(event.target.checked)} />Speak chapter titles</label>}<button type="button" onClick={() => setStep(4)}>Continue to output</button></section>}
     {step === 4 && <section><h2>Output</h2><OutputSettings formats={capabilities.outputFormats ?? ["m4b"]} format={format} onChange={setFormat} /><label>Title<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={500} /></label><label>Author<input value={author} onChange={(event) => setAuthor(event.target.value)} maxLength={500} /></label><label><input type="checkbox" checked={sourceCover} onChange={(event) => setSourceCover(event.target.checked)} />Use book cover</label><button type="button" onClick={review}>Review job</button></section>}
     {step === 5 && <section><h2>Review</h2><p>{chapters.length} chapter(s), {voices.find((voice) => voice.id === voiceId)?.name ?? "no voice"}, {format.toUpperCase()}</p>{preflight && <p>{preflight.normalizedCharacters} normalized characters</p>}{preflight?.estimatedCredits != null && <p>Book conversion: {preflight.estimatedCredits} credits (${(preflight.estimatedCredits / 100).toFixed(2)}). Available: {preflight.availableCredits} credits.</p>}{preflight?.valid === false && <p role="alert">{preflight.estimatedCredits != null && preflight.availableCredits != null && preflight.availableCredits < preflight.estimatedCredits ? "You do not have enough credits for this book conversion." : "The server rejected this job configuration."}</p>}<button type="button" onClick={submit} disabled={!preflight || preflight.valid === false}>Start job</button></section>}
   </fieldset></main>;

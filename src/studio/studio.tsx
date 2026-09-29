@@ -17,6 +17,7 @@ import { useCompletionNotices } from "./completion-notices";
 import {
   changeDraft,
   defaultSpeechSettings,
+  defaultChapterTitles,
   defaultPauseLengths,
   readLibrary,
   uid,
@@ -233,6 +234,7 @@ export function Studio({
         method: "gendered",
         format: cap.outputFormats?.[0] || "m4b",
         sourceCover: true,
+        chapterTitles: cap.spokenChapterTitles ? { ...defaultChapterTitles, overrides: {} } : undefined,
         pauseLengths: cap.pauseLengths ? { ...defaultPauseLengths } : undefined,
         speechSettings: cap.speechSettings ? { ...defaultSpeechSettings } : undefined,
         step: 1,

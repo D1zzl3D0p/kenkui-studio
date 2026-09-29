@@ -454,6 +454,11 @@ export interface components {
              */
             scenePauses?: boolean;
             /**
+             * Spokenchaptertitles
+             * @default true
+             */
+            spokenChapterTitles?: boolean;
+            /**
              * Speechsettings
              * @default true
              */
@@ -508,6 +513,18 @@ export interface components {
             method?: string;
             /** Modelid */
             modelId?: string | null;
+        };
+        /** ChapterAnnouncementResponse */
+        ChapterAnnouncementResponse: {
+            /** Chapterid */
+            chapterId: string;
+            /** Text */
+            text: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "inserted" | "existing" | "omitted";
         };
         /** ChapterResponse */
         ChapterResponse: {
@@ -637,7 +654,10 @@ export interface components {
              *       "headingAfterPauseMs": 0,
              *       "paragraphPauseMs": 0,
              *       "linePauseMs": 0,
-             *       "scenePauseMs": 0
+             *       "scenePauseMs": 0,
+             *       "speakChapterTitles": true,
+             *       "chapterTitlePauseMs": 750,
+             *       "chapterTitleOverrides": {}
              *     }
              */
             tts?: components["schemas"]["TtsRequest"];
@@ -747,6 +767,13 @@ export interface components {
         };
         /** PreflightResponse */
         PreflightResponse: {
+            /** Chapterannouncements */
+            chapterAnnouncements?: components["schemas"]["ChapterAnnouncementResponse"][];
+            /**
+             * Addedtitlecharacters
+             * @default 0
+             */
+            addedTitleCharacters?: number;
             /** Sourceid */
             sourceId: string;
             /** Normalizedcharacters */
@@ -827,6 +854,20 @@ export interface components {
              * @default 0
              */
             scenePauseMs?: number;
+            /**
+             * Speakchaptertitles
+             * @default true
+             */
+            speakChapterTitles?: boolean;
+            /**
+             * Chaptertitlepausems
+             * @default 750
+             */
+            chapterTitlePauseMs?: number;
+            /** Chaptertitleoverrides */
+            chapterTitleOverrides?: {
+                [key: string]: string | null;
+            };
         };
         /** ValidationError */
         ValidationError: {
