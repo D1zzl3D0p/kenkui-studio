@@ -5,7 +5,8 @@ through the server and the Kenkui library.
 
 The same frontend also has a Tauri desktop shell and mobile integration in progress. Native support is under
 development; see [native setup](docs/setup/native-development.md),
-[mobile setup](docs/setup/mobile-development.md), and the
+[mobile setup](docs/setup/mobile-development.md),
+[CI test builds](docs/setup/native-ci.md), and the
 [readiness backlog](docs/tauri-readiness.md).
 
 ```sh
