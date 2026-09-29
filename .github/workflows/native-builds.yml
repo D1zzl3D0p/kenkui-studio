@@ -131,6 +131,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install Android SDK and NDK
         run: |
           sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0' 'ndk;30.0.16248370'
@@ -157,7 +159,7 @@ jobs:
   ios:
     name: iOS simulator (ARM64)
     needs: checks
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4

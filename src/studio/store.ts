@@ -21,11 +21,13 @@ export type SettingsSupport = {
   speechSettings?: boolean;
   pauseLengths?: boolean;
   scenePauses?: boolean;
+  spokenChapterTitles?: boolean;
 };
 const everySetting: SettingsSupport = {
   speechSettings: true,
   pauseLengths: true,
   scenePauses: true,
+  spokenChapterTitles: true,
 };
 /** Tiers this draft may send, in the order a reader meets them. */
 export function pauseFieldsFor(support: SettingsSupport): (keyof PauseLengths)[] {
@@ -48,7 +50,13 @@ export function pauseLengthsFor(d: Pick<Draft, "pauseLengths" | "speechSettings"
     chapterPauseMs: d.speechSettings?.chapterPauses ? "1500" : "0",
   };
 }
+export type ChapterTitles = { enabled: boolean; pauseMs: string; overrides: { [chapterId: string]: string | null } };
+export const defaultChapterTitles: ChapterTitles = { enabled: true, pauseMs: "750", overrides: {} };
+export function chapterTitlesFor(d: Pick<Draft, "chapterTitles">): ChapterTitles {
+  return d.chapterTitles ?? { enabled: false, pauseMs: "750", overrides: {} };
+}
 export type Draft = {
+  chapterTitles?: ChapterTitles;
   pauseLengths?: PauseLengths;
   speechSettings?: SpeechSettings;
   id: string;
@@ -82,6 +90,7 @@ export const uid = () =>
   `studio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export function requestFor(d: Draft, support: SettingsSupport = everySetting): JobRequest {
   const pauseLengths = d.pauseLengths && pauseLengthsFor(d);
+  const titles = chapterTitlesFor(d);
   const fields = pauseFieldsFor(support);
   return {
     sourceId: d.book.sourceId,
@@ -97,6 +106,11 @@ export function requestFor(d: Draft, support: SettingsSupport = everySetting): J
           },
     tts: {
       normalizeText: true,
+      ...(support.spokenChapterTitles ? {
+        speakChapterTitles: titles.enabled,
+        chapterTitlePauseMs: validPauseLength(titles.pauseMs) ? Number(titles.pauseMs) : 750,
+        chapterTitleOverrides: Object.fromEntries(Object.entries(titles.overrides).filter(([id]) => d.chapters.includes(id))),
+      } : {}),
       ...(support.speechSettings ? d.speechSettings : undefined),
       ...(support.pauseLengths && pauseLengths &&
         fields.every((key) => validPauseLength(pauseLengths[key]))
@@ -139,6 +153,11 @@ export function readLibrary(key: string): Library {
           typeof d.method === "string" &&
           typeof d.unknown === "string" &&
           typeof d.originalSourceId === "string" &&
+          (d.chapterTitles === undefined ||
+            (d.chapterTitles !== null && typeof d.chapterTitles.enabled === "boolean" &&
+             typeof d.chapterTitles.pauseMs === "string" && d.chapterTitles.overrides !== null &&
+             typeof d.chapterTitles.overrides === "object" && !Array.isArray(d.chapterTitles.overrides) &&
+             Object.values(d.chapterTitles.overrides).every(v => v === null || typeof v === "string"))) &&
           (d.pauseLengths === undefined ||
             (typeof d.pauseLengths === "object" && d.pauseLengths !== null &&
               Object.values(d.pauseLengths).every(

@@ -39,7 +39,9 @@ those require device builds, an Apple signing team and provisioning.
 ## Build scope
 
 Node and Rust versions in the workflow match `mise.toml`; update them together.
-Android uses Java 21, SDK 36, Build-Tools 36.0.0 and NDK 30.0.16248370. Desktop
+Android uses Java 21, SDK 36, Build-Tools 36.0.0 and NDK 30.0.16248370.
+SDK setup installs `platform-tools` explicitly; the retired `tools` package is
+not requested. iOS uses macOS 15 so Xcode can read the generated project format. Desktop
 builds use explicit target triples and package formats. Cargo builds use the
 checked-in lockfile, and npm installs use `npm ci`.
 

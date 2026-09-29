@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KenkuiServerClient } from "../api/client";
 import type {
   Capabilities,
+  ChapterResponse,
   JobResponse,
   PreflightResponse,
   VoiceResponse,
@@ -9,7 +10,8 @@ import type {
 import { ErrorMessage } from "../components/error-message";
 import { BookCover } from "./cover";
 import { chapterSummary, isLongChapter, narrationOf } from "./estimates";
-import { requestFor, pauseFieldsFor, pauseLengthsFor, validPauseLength, type Draft } from "./store";
+import { ChapterTitleControls, ChapterTitleReview } from "./chapter-titles";
+import { chapterTitlesFor, requestFor, pauseFieldsFor, pauseLengthsFor, validPauseLength, type Draft } from "./store";
 import { VoicePicker, voiceInfo } from "./voice-picker";
 import { PauseControls, PauseReview, SpeechControls, SpeechReview } from "./speech-settings";
 
@@ -58,8 +60,9 @@ export function Composer({
       speechSettings: cap.speechSettings === true,
       pauseLengths: cap.pauseLengths === true,
       scenePauses: cap.scenePauses === true,
+      spokenChapterTitles: cap.spokenChapterTitles === true,
     }),
-    [cap.speechSettings, cap.pauseLengths, cap.scenePauses],
+    [cap.speechSettings, cap.pauseLengths, cap.scenePauses, cap.spokenChapterTitles],
   );
   const payload = useMemo(() => requestFor(d, support), [d, support]);
   const fingerprint = JSON.stringify(payload);
@@ -70,7 +73,9 @@ export function Composer({
     Boolean(cap.casting.models?.length);
   const pauseLengths = pauseLengthsFor(d);
   const narration = narrationOf(cap);
+  const titles = chapterTitlesFor(d);
   const valid = Boolean(
+    (!titles.enabled || (cap.spokenChapterTitles && validPauseLength(titles.pauseMs))) &&
     (!cap.pauseLengths ||
       pauseFieldsFor(support).every((key) => validPauseLength(pauseLengths[key]))) &&
     d.title.trim() &&
@@ -107,6 +112,11 @@ export function Composer({
     };
   }, [client, fingerprint, valid, retry]);
   const current = quote?.key === fingerprint && valid ? quote.value : undefined;
+  const speechCharacters = (chapter: ChapterResponse) => {
+    if (chapter.speechCharacters == null) return chapter.speechCharacters;
+    const announcement = current?.chapterAnnouncements?.find(a => a.chapterId === chapter.id);
+    return chapter.speechCharacters + (announcement?.kind === "inserted" ? announcement.text.length : 0);
+  };
   const priced = cap.billing?.mode === "credits";
   const enough =
     current?.estimatedCredits == null ||
@@ -232,6 +242,7 @@ export function Composer({
           </span>
         </div>
       )}
+      {titles.enabled && current && <p className="quiet">Includes {current.addedTitleCharacters ?? 0} added chapter-title characters. Existing opening headings are counted once.</p>}
       <ErrorMessage error={quoteError} />
       {Boolean(quoteError) && (
         <button className="text-button" onClick={() => setRetry((v) => v + 1)}>
@@ -414,16 +425,16 @@ export function Composer({
                           }
                         />
                         <span className="chapter-name">{c.title}</span>
-                        {chapterSummary(c.speechCharacters, narration) && (
+                        {chapterSummary(speechCharacters(c), narration) && (
                           <small
                             className={
-                              isLongChapter(c.speechCharacters, narration)
+                              isLongChapter(speechCharacters(c), narration)
                                 ? "chapter-meta long"
                                 : "chapter-meta"
                             }
                           >
-                            {chapterSummary(c.speechCharacters, narration)}
-                            {isLongChapter(c.speechCharacters, narration) &&
+                            {chapterSummary(speechCharacters(c), narration)}
+                            {isLongChapter(speechCharacters(c), narration) &&
                               " · unusually long"}
                           </small>
                         )}
@@ -432,7 +443,7 @@ export function Composer({
                   </div>
                   <p className="quiet">
                     Selecting fewer chapters can lower the estimate. Text is
-                    automatically prepared for speech.
+                    automatically prepared for speech. Approximate chapter durations cover speech; pauses add time.
                   </p>
                 </details>
                 {estimate}
@@ -593,6 +604,10 @@ export function Composer({
                     </p>
                   </details>
                 )}
+                {(cap.spokenChapterTitles || titles.enabled) && <ChapterTitleControls
+                  value={titles} chapters={d.book.chapters.filter(c => d.chapters.includes(c.id))}
+                  supported={cap.spokenChapterTitles === true} preview={current?.chapterAnnouncements}
+                  onChange={chapterTitles => update({ chapterTitles })} />}
                 {cap.pauseLengths && (
                   <PauseControls value={pauseLengths} support={support}
                     onChange={(pauseLengths) => update({ pauseLengths })} />
@@ -654,6 +669,7 @@ export function Composer({
                   </div>
                 </dl>
                 {cap.pauseLengths && <PauseReview value={pauseLengths} support={support} />}
+                {cap.spokenChapterTitles && <ChapterTitleReview enabled={titles.enabled} pauseMs={titles.pauseMs} preview={current?.chapterAnnouncements} />}
                 {cap.speechSettings && <SpeechReview value={d.speechSettings} showChapterToggle={!cap.pauseLengths} />}
                 {!cap.pauseLengths && d.pauseLengths && (
                   <p role="status">This server cannot apply custom pause lengths.</p>

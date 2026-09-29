@@ -14,6 +14,8 @@ export default defineConfig({
   testDir: "./tests/e2e",
   use: { baseURL: "http://127.0.0.1:4173" },
   webServer: {
+    // Startup includes the production build as well as the Python server.
+    timeout: 180_000,
     command: `npm run build && ${process.env.KENKUI_SERVER_PYTHON ?? path.join(serverRoot, ".venv/bin/python")} tests/e2e/local-server.py`,
     url: "http://127.0.0.1:4173/v1/health",
     reuseExistingServer: false,
