@@ -9,6 +9,25 @@ const entries = [
 ];
 
 describe("servers page", () => {
+  it("allows local startup to be stopped while selection is pending", async () => {
+    const host = fakeHost({ localServer: {
+      status: vi.fn().mockResolvedValue({ state: "starting", baseUrl: null, pid: 123, error: null,
+        progress: "Preparing voice 2 of 10: vctk" }),
+      start: vi.fn(),
+      stop: vi.fn().mockResolvedValue({ state: "stopped", baseUrl: null, pid: null, error: null }),
+    } });
+    host.servers.list = vi.fn().mockResolvedValue([{ id: "managed", label: "This computer", baseUrl: "", kind: "managed" }]);
+    host.servers.select = vi.fn().mockImplementation(() => new Promise(() => {}));
+    render(<ServersPage host={host} onSelect={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Use This computer" }));
+    const stop = screen.getByRole("button", { name: "Stop local server" });
+    await waitFor(() => expect(stop).toBeEnabled());
+    expect(screen.getByText(/Preparing voice 2 of 10/)).toBeInTheDocument();
+    fireEvent.click(stop);
+    await waitFor(() => expect(host.localServer!.stop).toHaveBeenCalled());
+    await screen.findByText("Local server: stopped");
+  });
+
   it("lists known servers and selects one", async () => {
     const host = fakeHost({
       can: { chooseServer: true, reachLoopback: true, manageLocalServer: false, saveToPath: true },

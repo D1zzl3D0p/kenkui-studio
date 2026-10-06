@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { createServerRegistry, serverOrigin, type RegistryStore } from "../src/host/native-registry";
-import type { HostCapabilities } from "../src/host";
+import type { HostCapabilities, LocalServer } from "../src/host";
 
 const desktop: HostCapabilities = { chooseServer: true, reachLoopback: true, saveToPath: true, manageLocalServer: false };
 const mobile = { ...desktop, reachLoopback: false, saveToPath: false };
 const cloud = "https://api.kenkui.test";
 
-function setup(initial: Record<string, unknown> = {}) {
+function setup(initial: Record<string, unknown> = {}, localServer?: LocalServer) {
   const values = new Map(Object.entries(initial));
   const save = vi.fn().mockResolvedValue(undefined);
   const store: RegistryStore = {
@@ -15,10 +15,37 @@ function setup(initial: Record<string, unknown> = {}) {
     save,
   };
   const probe = vi.fn().mockImplementation(async () => new Response('{"apiVersion":"1"}'));
-  return { registry: createServerRegistry(store, desktop, probe, cloud), probe, values, save };
+  return { registry: createServerRegistry(store, { ...desktop, manageLocalServer: Boolean(localServer) }, probe, cloud, localServer), probe, values, save };
 }
 
 describe("native server registry", () => {
+  it("resolves a fresh managed endpoint without persisting its port", async () => {
+    const start = vi.fn().mockResolvedValue({ state: "running", baseUrl: "http://127.0.0.1:12345" });
+    const local = { start, stop: vi.fn(), status: vi.fn() };
+    const { registry, values } = setup({}, local);
+    expect((await registry.list())[0]).toMatchObject({ id: "managed", label: "This computer" });
+    expect(start).not.toHaveBeenCalled();
+    await registry.select("managed");
+    expect(values.get("selected")).toBe("managed");
+    expect(values.has("entries")).toBe(false);
+    start.mockResolvedValue({ state: "running", baseUrl: "http://127.0.0.1:23456" });
+    expect(await registry.selected()).toMatchObject({ kind: "managed", baseUrl: "http://127.0.0.1:23456" });
+    await expect(registry.remove("managed")).rejects.toThrow("cannot be removed");
+  });
+
+  it("keeps the previous selection if local startup fails", async () => {
+    const local = { start: vi.fn().mockRejectedValue(new Error("startup timed out")), stop: vi.fn(), status: vi.fn() };
+    const { registry, values, save } = setup({ selected: "cloud" }, local);
+    await expect(registry.select("managed")).rejects.toThrow("startup timed out");
+    expect(values.get("selected")).toBe("cloud");
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("returns to the picker when a previously managed runtime is unavailable", async () => {
+    const { registry } = setup({ selected: "managed" });
+    await expect(registry.selected()).resolves.toBeUndefined();
+  });
+
   it("offers Cloud but starts without a selected server", async () => {
     const { registry } = setup();
     await expect(registry.selected()).resolves.toBeUndefined();

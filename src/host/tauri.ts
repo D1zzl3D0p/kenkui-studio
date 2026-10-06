@@ -18,6 +18,7 @@ import type {
 } from "./index";
 import { createServerRegistry } from "./native-registry";
 import { createNativeAuth } from "./native-auth";
+import { createLocalServer } from "./local-server";
 import { channelEventSourceFactory, type EventChannel, type EventFrame } from "./channel-event-source";
 
 type Invoke = (command: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -158,10 +159,13 @@ export async function createHost(): Promise<Host> {
   const invoke = tauriInvoke as unknown as Invoke;
   const platform = await osPlatform();
   const can = hostCapabilitiesFor(platform);
+  const localServer = can.reachLoopback ? createLocalServer(invoke) : undefined;
+  can.manageLocalServer = Boolean(localServer && (await localServer.status()).state !== "disabled");
 
   return {
     platform: can.reachLoopback ? "desktop" : "mobile",
     can,
+    localServer: can.manageLocalServer ? localServer : undefined,
     auth: createNativeAuth(invoke),
     notifications: nativeNotifications(),
     transport: (baseUrl) => ({
@@ -173,6 +177,7 @@ export async function createHost(): Promise<Host> {
       can,
       (url) => nativeFetch(invoke, new URL(url).origin, 10_000)(url),
       import.meta.env.VITE_KENKUI_NATIVE_API_ORIGIN || "https://api.kenkui.fm",
+      localServer,
     ),
     saveArtifact: async (artifact, suggestedName, options) => {
       if (!can.saveToPath) {

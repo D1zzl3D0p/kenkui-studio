@@ -3,6 +3,9 @@ pub mod auth;
 mod auth_commands;
 pub mod download;
 pub mod http;
+pub mod sidecar;
+#[cfg(feature = "native-shell")]
+mod sidecar_commands;
 pub mod sse;
 #[cfg(feature = "native-shell")]
 use tauri::Manager;
@@ -25,6 +28,7 @@ pub fn run() {
         .manage(auth::Sessions::default())
         .setup(|app| {
             app.manage(http::client()?);
+            sidecar_commands::setup(app)?;
             Ok(())
         })
         .plugin(tauri_plugin_mobile_export::init())
@@ -51,7 +55,15 @@ pub fn run() {
             auth_commands::kenkui_auth_sign_in,
             auth_commands::kenkui_auth_cancel,
             auth_commands::kenkui_auth_sign_out,
+            sidecar_commands::kenkui_local_server_start,
+            sidecar_commands::kenkui_local_server_stop,
+            sidecar_commands::kenkui_local_server_status,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Kenkui Studio");
+        .build(tauri::generate_context!())
+        .expect("error while building Kenkui Studio")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                sidecar_commands::shutdown(app);
+            }
+        });
 }

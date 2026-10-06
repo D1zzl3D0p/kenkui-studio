@@ -1,4 +1,4 @@
-import type { HostCapabilities, ServerEntry, ServerRegistry } from "./index";
+import type { HostCapabilities, LocalServer, ServerEntry, ServerRegistry } from "./index";
 import { isSupportedApiVersion } from "./version";
 
 export interface RegistryStore {
@@ -30,13 +30,24 @@ export function createServerRegistry(
   can: HostCapabilities,
   probe: (url: string) => Promise<Response>,
   cloudAddress: string,
+  localServer?: LocalServer,
 ): ServerRegistry {
+  const managed: ServerEntry | undefined = can.manageLocalServer && localServer
+    ? { id: "managed", label: "This computer", baseUrl: "", kind: "managed" }
+    : undefined;
+  const resolveManaged = async (): Promise<ServerEntry> => {
+    const status = await localServer!.start();
+    if (status.state !== "running" || !status.baseUrl) {
+      throw new Error(status.error || "The local server did not become ready.");
+    }
+    return { ...managed!, baseUrl: serverOrigin(status.baseUrl, can) };
+  };
   const cloud: ServerEntry = {
     id: "cloud", label: "Kenkui Cloud", baseUrl: serverOrigin(cloudAddress, can), kind: "cloud",
   };
   const read = async (): Promise<ServerEntry[]> => {
     const raw = await store.get<unknown>("entries");
-    const entries: ServerEntry[] = [cloud];
+    const entries: ServerEntry[] = managed ? [managed, cloud] : [cloud];
     if (!Array.isArray(raw)) return entries;
     for (const value of raw) {
       if (!value || typeof value !== "object" || value.kind !== "custom" ||
@@ -58,12 +69,14 @@ export function createServerRegistry(
     list: read,
     selected: async () => {
       const id = await store.get<unknown>("selected");
-      return (await read()).find((entry) => entry.id === id);
+      const entry = (await read()).find((entry) => entry.id === id);
+      return entry?.kind === "managed" ? resolveManaged() : entry;
     },
     select: async (id) => {
       if (!(await read()).some((entry) => entry.id === id)) {
         throw new Error("Choose a server from the list.");
       }
+      if (managed && id === managed.id) await resolveManaged();
       await store.set("selected", id);
       // Persist before the existing server-switch UI reloads the WebView.
       await store.save();
@@ -87,6 +100,7 @@ export function createServerRegistry(
       return entry;
     },
     remove: async (id) => {
+      if (managed && id === managed.id) throw new Error("The built-in local server cannot be removed.");
       if (id === cloud.id) throw new Error("The built-in Cloud server cannot be removed.");
       await write((await read()).filter((entry) => entry.id !== id));
       // A removed/stale selection intentionally returns to the picker on startup.

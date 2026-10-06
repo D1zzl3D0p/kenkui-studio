@@ -19,10 +19,29 @@ beforeEach(() => {
   vi.mocked(platform).mockReturnValue("macos");
   vi.mocked(load).mockResolvedValue({ get: vi.fn(), set: vi.fn(), save: vi.fn() } as never);
   vi.mocked(save).mockResolvedValue(null);
-
+  vi.mocked(tauriInvoke).mockImplementation(async (command) => {
+    if (command === "kenkui_local_server_status") {
+      return { state: "disabled", baseUrl: null, pid: null, error: null } as never;
+    }
+    return undefined as never;
+  });
 });
 
 describe("native host capabilities", () => {
+  it("offers managed lifecycle only when Rust has a configured desktop runtime", async () => {
+    vi.mocked(tauriInvoke).mockResolvedValueOnce({ state: "stopped", baseUrl: null, pid: null, error: null });
+    const host = await createHost();
+    expect(host.can.manageLocalServer).toBe(true);
+    expect(host.localServer).toBeDefined();
+    expect((await host.servers.list())[0]).toMatchObject({ id: "managed", kind: "managed" });
+  });
+
+  it("omits lifecycle controls when Rust reports the runtime disabled", async () => {
+    const host = await createHost();
+    expect(host.can.manageLocalServer).toBe(false);
+    expect(host.localServer).toBeUndefined();
+  });
+
   it("lets a desktop reach a local server and write files", () => {
     expect(hostCapabilitiesFor("macos")).toEqual({
       chooseServer: true, reachLoopback: true, manageLocalServer: false, saveToPath: true,
@@ -138,11 +157,11 @@ describe("native export", () => {
 
   it("streams through Rust without loading artifact bytes into JavaScript", async () => {
     vi.mocked(save).mockResolvedValue("/chosen/book.m4b");
+    const host = await createHost();
     vi.mocked(tauriInvoke).mockImplementationOnce(async (_command, args) => {
       (args as { channel: { onmessage(frame: unknown): void } }).channel.onmessage({ kind: "complete" });
       return 1 as never;
     });
-    const host = await createHost();
     const artifact = { url: "https://api.test/artifact", load: vi.fn() };
     await host.saveArtifact(artifact, "book.m4b");
     expect(tauriInvoke).toHaveBeenCalledWith("kenkui_download_start", expect.objectContaining({ url: artifact.url, path: "/chosen/book.m4b" }));

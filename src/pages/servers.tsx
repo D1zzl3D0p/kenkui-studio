@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Host, ServerEntry } from "../host/index";
+import type { Host, LocalServerStatus, ServerEntry } from "../host/index";
 import { ErrorMessage } from "../components/error-message";
 
 interface ServersPageProps { host: Host; onSelect: () => void }
@@ -9,8 +9,25 @@ export function ServersPage({ host, onSelect }: ServersPageProps) {
   const [address, setAddress] = useState("");
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
+  const [localStatus, setLocalStatus] = useState<LocalServerStatus>();
   const refresh = () => { void host.servers.list().then(setEntries).catch(setError); };
   useEffect(refresh, [host]);
+  useEffect(() => {
+    if (!host.localServer) return;
+    let active = true;
+    const update = () => { void host.localServer!.status().then((status) => {
+      if (active) setLocalStatus(status);
+    }).catch((cause) => { if (active) setError(cause); }); };
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [host]);
+
+  const stopLocal = async () => {
+    setError(undefined);
+    try { setLocalStatus(await host.localServer!.stop()); }
+    catch (cause) { setError(cause); }
+  };
 
   const choose = async (id: string) => {
     setBusy(true);
@@ -27,6 +44,18 @@ export function ServersPage({ host, onSelect }: ServersPageProps) {
   };
 
   return <main><h1>Servers</h1><ErrorMessage error={error} />
+    {host.localServer && <section aria-label="Local server">
+      <p>Local server: {localStatus?.state ?? "checking"}</p>
+      {localStatus?.state === "starting" && <p role="status">
+        {localStatus.progress ?? "Starting local server…"}
+        {" "}First startup downloads the voice models and may take several minutes.
+      </p>}
+      {localStatus?.error && <p role="alert">{localStatus.error}</p>}
+      <button type="button" onClick={() => void stopLocal()}
+        disabled={!localStatus || !["starting", "running"].includes(localStatus.state)}>
+        Stop local server
+      </button>
+    </section>}
     <ul>{entries?.map((entry) => <li key={entry.id}>
       {entry.label} <span>{entry.baseUrl}</span>
       <button type="button" disabled={busy} onClick={() => void choose(entry.id)}>Use {entry.label}</button>
