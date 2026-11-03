@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BillingResponse, Capabilities, CreditHistoryResponse } from "../api/generated/v1";
 import type { KenkuiServerClient } from "../api/client";
 import { ErrorMessage } from "../components/error-message";
@@ -24,17 +24,19 @@ export function BillingPage({
     setHistoryError(false);
   }, [client]);
   const result = new URLSearchParams(window.location.search).get("checkout");
+  const deadline = useMemo(() => Date.now() + 60_000, [client, result]);
   useEffect(() => {
     if (capabilities.billing?.mode !== "credits") return;
     let active = true;
     const fetch = () => {
+      if (document.visibilityState !== "visible") return;
       void client
         .billing()
         .then((value) => {
           if (active) {
             setBilling(value);
             setError(undefined);
-            if (value.creditHistoryAvailable) {
+            if (value.creditHistoryAvailable && document.visibilityState === "visible") {
               void client.creditHistory().then((result) => {
                 if (active) {
                   setHistory(result);
@@ -50,17 +52,22 @@ export function BillingPage({
           if (active) setError(cause);
         });
     };
-    fetch();
-    const timer = result === "success" ? setInterval(fetch, 3000) : undefined;
-    const stop = timer
-      ? setTimeout(() => clearInterval(timer), 60000)
-      : undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      clearTimeout(timer);
+      if (document.visibilityState !== "visible") return;
+      fetch();
+      if (result === "success" && Date.now() + 3000 <= deadline)
+        timer = setTimeout(tick, 3000);
+    };
+    tick();
+    document.addEventListener("visibilitychange", tick);
     return () => {
       active = false;
-      clearInterval(timer);
-      clearTimeout(stop);
+      document.removeEventListener("visibilitychange", tick);
+      clearTimeout(timer);
     };
-  }, [client, capabilities.billing?.mode, result, refresh]);
+  }, [client, capabilities.billing?.mode, result, refresh, deadline]);
   async function buy(credits: number) {
     if (buying) return;
     setBuying(true);

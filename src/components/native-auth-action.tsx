@@ -9,19 +9,22 @@ export function NativeAuthAction({ auth, origin, action }: {
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
-  const run = async () => {
+  const run = async (provider?: "google" | "github") => {
     setError(undefined);
     setBusy(true);
-    try { await auth[action](origin); }
+    try { if (action === "signIn") await auth.signIn(origin, provider); else await auth.signOut(origin); }
     catch (cause) { setError(cause); }
     finally { setBusy(false); }
   };
   return <>
-    <button type="button" className={action === "signIn" ? "primary" : "secondary full"}
+    {action === "signIn" && auth.providers ? auth.providers.map(provider =>
+      <button type="button" key={provider} className="primary" disabled={busy} onClick={() => void run(provider)}>
+        Continue with {provider === "google" ? "Google" : "GitHub"}
+      </button>) : <button type="button" className={action === "signIn" ? "primary" : "secondary full"}
       disabled={busy} onClick={() => void run()}>
       {busy ? (action === "signIn" ? "Waiting for browser…" : "Signing out…") : (action === "signIn" ? "Sign in" : "Sign out")}
-    </button>
-    {busy && action === "signIn" && <>
+    </button>}
+    {busy && !auth.providers && action === "signIn" && <>
       <p role="status">Complete sign-in in your browser, then return here.</p>
       <button type="button" className="text-button" onClick={() => void auth.cancelSignIn().catch(setError)}>Cancel sign-in</button>
     </>}

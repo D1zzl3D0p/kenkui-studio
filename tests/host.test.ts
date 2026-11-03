@@ -51,10 +51,10 @@ describe("web host", () => {
     await expect(host.servers.add("http://127.0.0.1:7850")).rejects.toThrow(/does not support/i);
   });
 
-  it("returns the browser's own fetch and EventSource as its transport", async () => {
+  it("uses scoped fetch for requests and progress events", async () => {
     const host = await createHost();
 
-    expect(host.transport("")).toEqual({});
+    expect(host.transport("")).toMatchObject({fetch:expect.any(Function),eventSource:expect.any(Function)});
   });
 
   it("reports a resume when the document becomes visible again", async () => {

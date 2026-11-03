@@ -36,39 +36,63 @@ describe("native authentication boundary", () => {
 
   it("offers native browser sign-in with cancellation instead of a WebView link", async () => {
     let reject!: (cause: unknown) => void;
-    const invoke = vi.fn().mockImplementation((command: string) => command === "kenkui_auth_sign_in"
-      ? new Promise((_, fail) => { reject = fail; }) : Promise.resolve());
+    const invoke = vi.fn().mockImplementation((command: string) =>
+      command === "kenkui_auth_sign_in"
+        ? new Promise((_, fail) => {
+            reject = fail;
+          })
+        : Promise.resolve(),
+    );
     const auth = createNativeAuth(invoke);
-    render(<SignInPage capabilities={capabilities} client={client} auth={auth} />);
+    render(
+      <SignInPage capabilities={capabilities} client={client} auth={auth} />,
+    );
     expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByRole("status")).toHaveTextContent("browser");
     fireEvent.click(screen.getByRole("button", { name: "Cancel sign-in" }));
     expect(invoke).toHaveBeenCalledWith("kenkui_auth_cancel", {});
     await act(async () => reject("Sign-in cancelled"));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Sign-in cancelled");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Sign-in cancelled",
+    );
     expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
   });
 
   it("signs out through native storage rather than submitting a browser form", async () => {
     const invoke = vi.fn().mockResolvedValue(undefined);
-    const { container } = render(<AccountMenu client={client} signedIn initiallyOpen auth={createNativeAuth(invoke)} />);
+    const { container } = render(
+      <AccountMenu
+        client={client}
+        signedIn
+        initiallyOpen
+        auth={createNativeAuth(invoke)}
+      />,
+    );
     expect(container.querySelector("form")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("kenkui_auth_sign_out", { origin }));
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("kenkui_auth_sign_out", { origin }),
+    );
   });
 
   it("restores native credentials before session lookup and retries after sign-in", async () => {
     const invoke = vi.fn().mockResolvedValue(undefined);
     const auth = createNativeAuth(invoke);
     const host = fakeHost({ auth });
-    const session = vi.fn().mockRejectedValue(new KenkuiApiError(401, "Sign in"));
+    const session = vi
+      .fn()
+      .mockRejectedValue(new KenkuiApiError(401, "Sign in"));
     const api = {
       capabilities: vi.fn().mockResolvedValue(capabilities),
-      session, storageScope: () => origin, onUnauthorized: () => () => undefined,
+      session,
+      storageScope: () => origin,
+      onUnauthorized: () => () => undefined,
     } as unknown as KenkuiServerClient;
     render(<App client={api} host={host} initialPath="/sign-in" />);
-    expect(await screen.findByRole("button", { name: "Sign in" })).toBeVisible();
+    expect(
+      await screen.findByRole("button", { name: "Sign in" }),
+    ).toBeVisible();
     expect(invoke).toHaveBeenCalledWith("kenkui_auth_restore", { origin });
     expect(session).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
@@ -76,11 +100,29 @@ describe("native authentication boundary", () => {
     expect(invoke).toHaveBeenCalledWith("kenkui_auth_sign_in", { origin });
   });
 
-  it("keeps browser cookie login and logout behavior", () => {
-    const { unmount } = render(<SignInPage capabilities={capabilities} client={client} />);
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", `${origin}/v1/auth/login`);
+  it("offers the two managed providers and signs out through Managed Auth", async () => {
+    const auth = fakeHost().auth!;
+    const { unmount } = render(
+      <SignInPage capabilities={capabilities} client={client} auth={auth} />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue with Google" }),
+    );
+    await waitFor(() =>
+      expect(auth.signIn).toHaveBeenCalledWith(origin, "google"),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue with GitHub" }),
+    );
+    await waitFor(() =>
+      expect(auth.signIn).toHaveBeenCalledWith(origin, "github"),
+    );
     unmount();
-    const { container } = render(<AccountMenu client={client} signedIn initiallyOpen />);
-    expect(container.querySelector("form")).toHaveAttribute("action", `${origin}/v1/auth/logout`);
+    const { container } = render(
+      <AccountMenu client={client} signedIn initiallyOpen auth={auth} />,
+    );
+    expect(container.querySelector("form")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(auth.signOut).toHaveBeenCalledWith(origin));
   });
 });

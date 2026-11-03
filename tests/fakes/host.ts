@@ -31,6 +31,12 @@ export function fakeHost(overrides: Partial<Host> = {}): Host {
       add: vi.fn().mockResolvedValue(origin),
       remove: vi.fn().mockResolvedValue(undefined),
     },
+    auth: {
+      providers:["google", "github"],
+      restore:vi.fn().mockResolvedValue(undefined), signIn:vi.fn().mockResolvedValue(undefined),
+      signOut:vi.fn().mockResolvedValue(undefined), cancelSignIn:vi.fn().mockResolvedValue(undefined),
+      onChanged:vi.fn().mockReturnValue(() => {}),
+    },
     saveArtifact: vi.fn().mockResolvedValue(undefined),
     openExternal: vi.fn().mockResolvedValue(undefined),
     onResume: vi.fn().mockReturnValue(() => undefined),

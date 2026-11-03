@@ -1,7 +1,7 @@
 import type { EventSourceFactory, EventSourceLike } from "../api/events";
 
 /** One parsed server-sent event. `type` is "message" when the frame names no event. */
-export interface EventFrame { type: string; data: string }
+export interface EventFrame { type: string; data: string; id?: string }
 
 /** A transport-agnostic stream of frames, satisfied natively by a Tauri Channel. */
 export interface EventChannel {
@@ -10,7 +10,7 @@ export interface EventChannel {
   close(): void;
 }
 
-export type EventChannelFactory = (url: string) => EventChannel;
+export type EventChannelFactory = (url: string, cursor?: string) => EventChannel;
 
 /**
  * Adapts a frame channel to the EventSource shape `connectJobEvents` expects,
@@ -23,10 +23,10 @@ export function channelEventSourceFactory(open: EventChannelFactory): EventSourc
     private readonly listeners = new Map<string, ((event: MessageEvent<string>) => void)[]>();
     private readonly channel: EventChannel;
 
-    constructor(url: string) {
-      this.channel = open(url);
+    constructor(url: string, options?: {lastEventId?:string}) {
+      this.channel = open(url, options?.lastEventId);
       this.channel.onFrame((frame) => {
-        const message = new MessageEvent(frame.type, { data: frame.data }) as MessageEvent<string>;
+        const message = new MessageEvent(frame.type, { data: frame.data, lastEventId:frame.id }) as MessageEvent<string>;
         if (frame.type === "message") this.onmessage?.(message);
         for (const listener of this.listeners.get(frame.type) ?? []) listener(message);
       });

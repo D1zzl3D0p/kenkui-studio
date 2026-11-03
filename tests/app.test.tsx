@@ -583,8 +583,8 @@ describe("existing Studio feature parity", () => {
     });
     render(<App client={client as never} host={fakeHost()} />);
     expect(
-      await screen.findByRole("link", { name: "Sign in" }),
-    ).toHaveAttribute("href", "/v1/auth/login");
+      await screen.findByRole("button", { name: "Continue with Google" }),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 });
@@ -637,8 +637,7 @@ it("moves signed-in account actions into the header and dismisses them with Esca
   const account = await screen.findByRole("button", { name: "Account" });
   expect(account.closest("header")).not.toBeNull();
   expect(await screen.findByRole("heading", { name: "New audiobook" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Sign out" }).closest("form")).toHaveAttribute("method", "post");
-  expect(screen.getByRole("button", { name: "Sign out" }).closest("form")).toHaveAttribute("action", "/v1/auth/logout");
+  expect(screen.getByRole("button", { name: "Sign out" }).closest("form")).toBeNull();
   expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
   fireEvent.keyDown(document, { key: "Escape" });
   expect(account).toHaveAttribute("aria-expanded", "false");
@@ -657,7 +656,7 @@ it("offers only sign-in actions when the session is unavailable", async () => {
   });
   render(<App client={client as never} host={fakeHost()} />);
   fireEvent.click(await screen.findByRole("button", { name: "Account" }));
-  expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(2);
+  expect(screen.getAllByRole("button", {name:"Continue with GitHub"})).toHaveLength(2);
   expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
 });
 

@@ -42,6 +42,6 @@ pub async fn kenkui_auth_sign_out(
     origin: String,
     sessions: tauri::State<'_, Sessions>,
     client: tauri::State<'_, reqwest::Client>,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     sessions.sign_out(&origin, &client).await
 }

@@ -123,14 +123,22 @@ export function Studio({
   useEffect(() => {
     let live = true,
       fetching = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const load = async () => {
-      if (fetching) return;
+      if (fetching || document.visibilityState !== "visible") return;
+      clearTimeout(timer);
       fetching = true;
       try {
         const result = await client.jobs();
         if (live) {
           setJobs(result.items);
           setJobsError(undefined);
+          if (
+            result.items.some((job) =>
+              ["queued", "running", "cancel_requested"].includes(job.status),
+            )
+          )
+            timer = setTimeout(() => void load(), 15000);
         }
       } catch (cause) {
         if (live) setJobsError(cause);
@@ -139,12 +147,15 @@ export function Studio({
       }
     };
     void load();
-    const timer = setInterval(() => {
+    const visibility = () => {
+      clearTimeout(timer);
       if (document.visibilityState === "visible") void load();
-    }, 15000);
+    };
+    document.addEventListener("visibilitychange", visibility);
     return () => {
       live = false;
-      clearInterval(timer);
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", visibility);
     };
   }, [client, refresh]);
   useEffect(() => {

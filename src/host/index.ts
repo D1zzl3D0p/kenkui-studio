@@ -86,13 +86,14 @@ export interface Host {
   readonly localServer?: LocalServer;
   /** System notifications. Absent where the platform offers none. */
   readonly notifications?: Notifications;
-  /** Native-owned authentication. Absent for browser cookie sessions. */
+  /** Hosted sign-in actions. The browser uses Managed Auth and desktop credentials stay in Rust. */
   readonly auth?: {
+    providers?: readonly ("google" | "github")[];
     restore(origin: string): Promise<void>;
-    signIn(origin: string): Promise<void>;
+    signIn(origin: string, provider?: "google" | "github"): Promise<void>;
     cancelSignIn(): Promise<void>;
     signOut(origin: string): Promise<void>;
-    onChanged(listener: () => void): () => void;
+    onChanged(listener: (notice?: string) => void): () => void;
   };
   saveArtifact(artifact: ArtifactSource, suggestedName: string, options?: SaveArtifactOptions): Promise<void>;
   openExternal(url: string): Promise<void>;
