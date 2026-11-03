@@ -1609,58 +1609,6 @@ a {
   text-align: right;
   margin-top: 12px;
 }
-.scene-preview {
-  border: 1px solid var(--line);
-  background: var(--surface);
-  border-radius: 8px;
-  padding: 20px;
-}
-.scene-preview .section-top {
-  margin-bottom: 14px;
-  gap: 10px;
-}
-.scene-preview h3 {
-  font-family: inherit;
-  font-size: 16px;
-  letter-spacing: 0;
-  font-weight: 550;
-}
-.free-badge {
-  display: inline-flex;
-  border: 1px solid var(--line);
-  padding: 4px 8px;
-  border-radius: 20px;
-  font-size: 10px;
-  white-space: nowrap;
-  color: var(--muted);
-}
-.scene-modes {
-  display: flex;
-  padding: 4px;
-  border-radius: 6px;
-  background: var(--bg);
-  gap: 5px;
-}
-.scene-modes button {
-  flex: 1;
-  padding: 8px 12px;
-  min-height: 40px;
-  border-radius: 4px;
-  font-size: 12px;
-  border: 1px solid transparent;
-}
-.scene-modes button[aria-pressed="true"] {
-  background: var(--raised);
-  border-color: var(--line);
-  color: var(--ink);
-}
-.scene-preview .quiet {
-  font-size: 11px;
-  margin: 10px 0 0;
-}
-.scene-preview .preview-wide {
-  margin-top: 12px;
-}
 .editor details .secondary {
   margin-bottom: 14px;
 }
@@ -1823,9 +1771,6 @@ a {
     font-size: 11px;
     padding: 8px 3px;
   }
-  .scene-preview {
-    padding: 16px;
-  }
   .cast-row {
     padding: 16px;
   }
@@ -1876,9 +1821,6 @@ a {
     grid-template-columns: 1fr;
     gap: 25px;
   }
-  .scene-preview .section-top {
-    flex-wrap: wrap;
-  }
   .editor-footer .primary {
     gap: 8px;
   }
@@ -1900,9 +1842,6 @@ a {
   }
   .narration-options small {
     font-size: 11px;
-  }
-  .scene-modes button {
-    padding: 8px 6px;
   }
   .credit-packs {
     grid-template-columns: 1fr;
