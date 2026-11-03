@@ -1,0 +1,10 @@
+{
+  "staging": [{
+    "apiOrigin": "https://api.staging.kenkui.fm",
+    "issuer": "https://ep-quiet-lab-bb7fuxf2.neonauth.c-15.us-east-1.aws.neon.tech/kenkui/auth",
+    "jwksUrl": "https://ep-quiet-lab-bb7fuxf2.neonauth.c-15.us-east-1.aws.neon.tech/kenkui/auth/.well-known/jwks.json",
+    "clientId": "UwdWqqDMzWqQGrtIUHDmRBIENDDogySX",
+    "resource": "https://api.staging.kenkui.fm"
+  }],
+  "production": []
+}
