@@ -13,6 +13,7 @@ test("uploads a cover, resumes a draft, and downloads a completed book", async (
   page.on("response", (r) => {
     if (r.status() >= 500) errors.push(`${r.status()} ${r.url()}`);
   });
+  const capabilities = await (await page.request.get("/v1/capabilities")).json();
   await page.goto("/");
   await page
     .getByLabel("EPUB source")
@@ -75,9 +76,11 @@ test("uploads a cover, resumes a draft, and downloads a completed book", async (
     headingAfterPauseMs: 600,
     paragraphPauseMs: 250,
     linePauseMs: 100,
-    speakChapterTitles: true,
-    chapterTitlePauseMs: 750,
-    chapterTitleOverrides: {},
+    ...(capabilities.spokenChapterTitles ? {
+      speakChapterTitles: true,
+      chapterTitlePauseMs: 750,
+      chapterTitleOverrides: {},
+    } : {}),
   });
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download M4B" }).click();

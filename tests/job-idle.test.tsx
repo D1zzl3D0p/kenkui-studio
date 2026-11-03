@@ -272,3 +272,17 @@ it.each(["empty", "terminal"])(
     expect(jobs).toHaveBeenCalledTimes(2);
   },
 );
+
+
+it("keeps snapshot fallback without restarting exhausted SSE retries", async () => {
+  vi.useFakeTimers();
+  const getJob = vi.fn().mockResolvedValue(snapshot("running"));
+  const events = vi.fn(() => { throw Error("SSE unavailable"); });
+  render(<JobView id="book" client={{ getJob, events } as unknown as KenkuiServerClient} host={fakeHost()} capabilities={cap} onHome={vi.fn()} onChanged={vi.fn()} />);
+  await act(() => vi.advanceTimersByTimeAsync(60000));
+  expect(events).toHaveBeenCalledTimes(1);
+  const requests = getJob.mock.calls.length;
+  await act(() => vi.advanceTimersByTimeAsync(60000));
+  expect(getJob.mock.calls.length).toBeGreaterThan(requests);
+  expect(events).toHaveBeenCalledTimes(1);
+});

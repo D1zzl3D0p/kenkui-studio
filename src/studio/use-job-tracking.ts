@@ -20,6 +20,7 @@ export function useJobTracking({ id, client, host }: { id: string; client: Kenku
       lastEventId = "";
     let stream: ReturnType<KenkuiServerClient["events"]> | undefined;
     let poll: ReturnType<typeof setTimeout> | undefined;
+    let streamUnavailable = false;
     let fetching = false,
       failures = 0;
     setError(undefined);
@@ -65,6 +66,9 @@ export function useJobTracking({ id, client, host }: { id: string; client: Kenku
         if (!live || current !== generation) return;
         update(snapshot);
         if (finished) return;
+        // The transport owns its bounded SSE retry budget. Once exhausted,
+        // keep only snapshot fallback until explicit retry or foreground resume.
+        if (streamUnavailable) { schedule(); return; }
         try {
           stream = client.events(
             id,
@@ -90,6 +94,7 @@ export function useJobTracking({ id, client, host }: { id: string; client: Kenku
               if (!live || current !== generation) return;
               setConnection(state);
               if (state === "disconnected") {
+                streamUnavailable = true;
                 stop();
                 if (cause && !isTransientRequestError(cause)) {
                   setError(cause);
@@ -105,6 +110,7 @@ export function useJobTracking({ id, client, host }: { id: string; client: Kenku
             },
           );
         } catch {
+          streamUnavailable = true;
           // The snapshot established active work even if SSE is unavailable.
           setConnection("disconnected");
           schedule();
@@ -131,6 +137,7 @@ export function useJobTracking({ id, client, host }: { id: string; client: Kenku
     document.addEventListener("visibilitychange", hidden);
     const off = host.onResume(() => {
       if (fetching || finished) return;
+      streamUnavailable = false;
       pause();
       void refresh();
     });
