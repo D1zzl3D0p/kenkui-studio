@@ -1,3 +1,4 @@
+import { isTransientRequestError } from "../api/errors";
 import { useEffect, useRef, useState } from "react";
 import type { KenkuiServerClient } from "../api/client";
 import type {
@@ -70,6 +71,7 @@ export function Studio({
       return "system";
     }
   });
+  const lastListHadActiveJobs = useRef(false);
   const input = useRef<HTMLInputElement>(null),
     dialog = useRef<HTMLDialogElement>(null),
     uploading = useRef(false),
@@ -124,8 +126,14 @@ export function Studio({
     let live = true,
       fetching = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0,
+      stopped = false;
+    const schedule = () => {
+      if (document.visibilityState === "visible")
+        timer = setTimeout(() => void load(), 15000);
+    };
     const load = async () => {
-      if (fetching || document.visibilityState !== "visible") return;
+      if (stopped || fetching || document.visibilityState !== "visible") return;
       clearTimeout(timer);
       fetching = true;
       try {
@@ -133,15 +141,23 @@ export function Studio({
         if (live) {
           setJobs(result.items);
           setJobsError(undefined);
-          if (
-            result.items.some((job) =>
-              ["queued", "running", "cancel_requested"].includes(job.status),
-            )
-          )
-            timer = setTimeout(() => void load(), 15000);
+          failures = 0;
+          lastListHadActiveJobs.current = result.items.some((job) =>
+            ["queued", "running", "cancel_requested"].includes(job.status),
+          );
+          if (lastListHadActiveJobs.current) schedule();
         }
       } catch (cause) {
-        if (live) setJobsError(cause);
+        if (live) {
+          setJobsError(cause);
+          if (
+            lastListHadActiveJobs.current &&
+            isTransientRequestError(cause) &&
+            ++failures <= 3
+          )
+            schedule();
+          else stopped = true;
+        }
       } finally {
         fetching = false;
       }

@@ -117,8 +117,12 @@ describe("web notifications", () => {
       ]);
 
       // Activating the notice must take the reader to the book it announced.
-      FakeNotification.last?.onclick?.();
-      expect(navigate).toHaveBeenCalledWith("/jobs/a");
+      const focus = vi.spyOn(window,"focus").mockImplementation(() => {});
+      try {
+        FakeNotification.last?.onclick?.();
+        expect(focus).toHaveBeenCalledOnce();
+        expect(navigate).toHaveBeenCalledWith("/jobs/a");
+      } finally {focus.mockRestore();}
     });
   });
 

@@ -14,6 +14,8 @@ pub(super) struct Record {
     pub api_origin: String,
     pub config: Config,
     pub subject: String,
+    #[serde(default)]
+    pub generation: String,
     pub refresh: String,
     pub uncertain: bool,
 }

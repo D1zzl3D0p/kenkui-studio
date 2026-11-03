@@ -1,3 +1,4 @@
+import { isTransientRequestError } from "./errors";
 import type { EventResponse, JobResponse } from "./generated/v1";
 
 export interface JobEventStream {
@@ -24,7 +25,7 @@ export function connectJobEvents(
   refetch: () => Promise<JobResponse>,
   onEvent?: (event: EventResponse) => void,
   onSnapshot?: (job: JobResponse) => void,
-  onConnection?: (state: "connected" | "reconnecting" | "disconnected") => void,
+  onConnection?: (state: "connected" | "reconnecting" | "disconnected", cause?: unknown) => void,
   cursor?: {lastEventId: string; onCursor(id: string): void},
 ): JobEventStream {
   let source: EventSourceLike | undefined;
@@ -82,7 +83,7 @@ export function connectJobEvents(
       attempts = 0;
       onConnection?.("connected");
       onEvent?.(event);
-      if (snapshotEvents[event.type]) void recover().catch(() => onConnection?.("disconnected"));
+      if (snapshotEvents[event.type]) void recover().catch(cause => {if (!stopped) {stop(); onConnection?.("disconnected",cause);}});
     } catch { /* malformed display event */ }
   };
   const connect = () => {
@@ -103,8 +104,10 @@ export function connectJobEvents(
       void recover().then((job) => {
         if (stopped || reconnectGeneration !== generation || terminalStatuses[job.status]) return;
         retryTimer = setTimeout(connect, attempts * 100);
-      }).catch(() => {
-        if (!stopped && reconnectGeneration === generation) retryTimer = setTimeout(connect, attempts * 100);
+      }).catch(cause => {
+        if (stopped || reconnectGeneration !== generation) return;
+        if (!isTransientRequestError(cause)) {stop(); onConnection?.("disconnected",cause); return;}
+        retryTimer = setTimeout(connect, attempts * 100);
       });
     };
   };

@@ -189,3 +189,13 @@ Cloudflare Static Assets configuration is in `wrangler.jsonc`. Run
 validate deployment, then omit `--dry-run` to publish. Use `deploy:production`
 for the production origin. See the server's `deploy/production.md` for the
 complete release sequence and account prerequisites.
+
+### Hosted sign-in trust configuration
+
+Web builds read `VITE_KENKUI_AUTH_AUTHORITIES` and Rust desktop builds read `KENKUI_AUTH_AUTHORITIES` at compile time. Supply the same public JSON array from trusted release configuration. For example, a test deployment could use:
+
+```json
+[{"apiOrigin":"https://api.example.test","issuer":"https://auth.example.test/db/auth","jwksUrl":"https://auth.example.test/db/auth/jwks","clientId":"public-desktop-client","resource":"https://api.example.test"}]
+```
+
+Use the exact HTTPS API origin (no trailing slash) as the resource and the full managed branch issuer. Each API origin and each issuer origin must be unique across the array. Pin the actual public client's ID and the branch signing-key URL. The version-2 configuration served by the selected API must agree with its compiled entry. Rebuild after changing these pins. Hosted login for an unlisted custom server requires a build that pins that deployment. Local servers advertising no authentication, including servers omitting the optional auth capability, require no pins.

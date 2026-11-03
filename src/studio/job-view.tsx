@@ -1,3 +1,4 @@
+import { isTransientRequestError } from "../api/errors";
 import { useEffect, useRef, useState } from "react";
 import type { KenkuiServerClient } from "../api/client";
 import type { Capabilities, JobResponse } from "../api/generated/v1";
@@ -56,7 +57,8 @@ export function JobView({
       lastEventId = "";
     let stream: ReturnType<KenkuiServerClient["events"]> | undefined;
     let poll: ReturnType<typeof setTimeout> | undefined;
-    let fetching = false;
+    let fetching = false,
+      failures = 0;
     setError(undefined);
     setJob(undefined);
     setConnection("connected");
@@ -72,6 +74,8 @@ export function JobView({
     };
     const update = (snapshot: JobResponse) => {
       if (!live) return;
+      failures = 0;
+      setError(undefined);
       setJob(snapshot);
       if (terminal.has(snapshot.status)) {
         finished = true;
@@ -98,50 +102,56 @@ export function JobView({
         if (!live || current !== generation) return;
         update(snapshot);
         if (finished) return;
-        stream = client.events(
-          id,
-          (event) => {
-            if (!live || current !== generation) return;
-            const state = (
-              {
-                completed: "succeeded",
-                failed: "failed",
-                cancelled: "cancelled",
-                cancel_requested: "cancel_requested",
-              } as const
-            )[event.type as "completed"];
-            setJob((job) => ({
-              ...job,
-              id,
-              status: state || job?.status || "running",
-              progress: event.progress,
-            }));
-          },
-          update,
-          (state) => {
-            if (!live || current !== generation) return;
-            setConnection(state);
-            if (state === "disconnected") {
-              stop();
-              schedule();
-            }
-          },
-          {
-            lastEventId,
-            onCursor: (value) => {
-              lastEventId = value;
+        try {
+          stream = client.events(
+            id,
+            (event) => {
+              if (!live || current !== generation) return;
+              const state = (
+                {
+                  completed: "succeeded",
+                  failed: "failed",
+                  cancelled: "cancelled",
+                  cancel_requested: "cancel_requested",
+                } as const
+              )[event.type as "completed"];
+              setJob((job) => ({
+                ...job,
+                id,
+                status: state || job?.status || "running",
+                progress: event.progress,
+              }));
             },
-          },
-        );
+            update,
+            (state,cause) => {
+              if (!live || current !== generation) return;
+              setConnection(state);
+              if (state === "disconnected") {
+                stop();
+                if (cause && !isTransientRequestError(cause)) {
+                  setError(cause);
+                  stopTracking.current();
+                } else schedule();
+              }
+            },
+            {
+              lastEventId,
+              onCursor: (value) => {
+                lastEventId = value;
+              },
+            },
+          );
+        } catch {
+          // The snapshot established active work even if SSE is unavailable.
+          setConnection("disconnected");
+          schedule();
+        }
       } catch (cause) {
         if (live && current === generation) {
           setConnection("disconnected");
-          if (!stream) schedule();
-          if (!(
-            cause instanceof Error &&
-            cause.message.includes("server-sent events")
-          ))
-            setError(cause);
+          setError(cause);
+          if (isTransientRequestError(cause) && ++failures <= 3) schedule();
+          else stopTracking.current();
         }
       } finally {
         if (current === generation) fetching = false;
@@ -240,7 +250,7 @@ export function JobView({
         <section className="editor">
           <ErrorMessage error={error} />
           {!job ? (
-            <p role="status">Loading conversion…</p>
+            error ? <button className="secondary" onClick={() => setReload(n => n+1)}>Retry job</button> : <p role="status">Loading conversion…</p>
           ) : (
             <>
               <div className="eyebrow">{statusLabel(job.status)}</div>

@@ -2,6 +2,8 @@ import type { Page } from "@playwright/test";
 
 const localOrigin = "http://127.0.0.1:4173";
 export const studioOrigin = "https://studio.example.test";
+export const syntheticAuthority = {apiOrigin:studioOrigin,resource:studioOrigin,issuer:"https://auth.example.test/db/auth",
+  jwksUrl:"https://auth.example.test/db/auth/jwks",clientId:"synthetic-client"};
 
 /** Exercise the scoped HTTPS transport using local fixtures for every origin. */
 export async function mockManagedStudio(page: Page) {
@@ -10,7 +12,7 @@ export async function mockManagedStudio(page: Page) {
     await route.fulfill({response: await route.fetch({url: localOrigin + url.pathname + url.search})});
   });
   await page.route("**/v1/auth/native/config", route => route.fulfill({json:{
-    protocolVersion:2, issuer:"https://auth.example.test/db/auth",
+    protocolVersion:2, ...syntheticAuthority,
   }}));
   await page.route("https://auth.example.test/**", route => {
     const headers = {"access-control-allow-origin":studioOrigin, "access-control-allow-credentials":"true",

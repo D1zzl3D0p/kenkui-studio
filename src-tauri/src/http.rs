@@ -177,7 +177,11 @@ pub async fn authenticated_send(
 ) -> Result<reqwest::Response, String> {
     let token = sessions.token_for(url, client).await?;
     let first = request.try_clone().ok_or("Request cannot be retried")?;
-    let response = send_api(first, token.as_deref()).await?;
+    let response = send_api(
+        first,
+        token.as_ref().map(|credential| credential.token.as_str()),
+    )
+    .await?;
     let Some(token) = token else {
         return Ok(response);
     };
@@ -188,7 +192,7 @@ pub async fn authenticated_send(
         .refresh_after_unauthorized(url, client, &token)
         .await?
     {
-        Some(fresh) => send_api(request, Some(&fresh)).await,
+        Some(fresh) => send_api(request, Some(&fresh.token)).await,
         None => Ok(response),
     }
 }

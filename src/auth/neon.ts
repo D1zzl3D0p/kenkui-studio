@@ -1,3 +1,4 @@
+import { expectedAuthority } from "./authorities";
 import { createAuthClient } from "@neon/auth";
 import { BetterAuthVanillaAdapter } from "@neon/auth/vanilla/adapters";
 import { KenkuiApiError, asApiError } from "../api/errors";
@@ -34,8 +35,10 @@ export function browserSession(
   async function initialize() {
     if (managed) return managed;
     loading ??= (async () => {
-      if (!origin.startsWith("https://"))
-        throw new Error("Hosted sign-in requires HTTPS.");
+      const trusted = expectedAuthority(
+        origin,
+        import.meta.env.VITE_KENKUI_AUTH_AUTHORITIES,
+      );
       const response = await fetcher(origin + "/v1/auth/native/config", {
         credentials: "omit",
         redirect: "error",
@@ -43,19 +46,17 @@ export function browserSession(
       if (!response.ok)
         throw new Error("Sign-in configuration is unavailable.");
       const config = await response.json();
-      const issuer = new URL(config.issuer);
       if (
         config.protocolVersion !== 2 ||
-        issuer.protocol !== "https:" ||
-        issuer.username ||
-        issuer.password ||
-        issuer.search ||
-        issuer.hash ||
-        issuer.pathname.endsWith("/") ||
-        issuer.href !== config.issuer
+        config.issuer !== trusted.issuer ||
+        config.jwksUrl !== trusted.jwksUrl ||
+        config.resource !== trusted.resource ||
+        config.clientId !== trusted.clientId
       )
-        throw new Error("Invalid sign-in configuration.");
-      managed = create(config.issuer);
+        throw new Error(
+          "The server sign-in configuration does not match this Studio build.",
+        );
+      managed = create(trusted.issuer);
       return managed;
     })().finally(() => {
       loading = undefined;
@@ -139,7 +140,12 @@ export function browserSession(
       throw error;
     }
     const signed = new URL((await response.json()).url);
-    if (signed.protocol !== "https:" || signed.username || signed.password || signed.hash)
+    if (
+      signed.protocol !== "https:" ||
+      signed.username ||
+      signed.password ||
+      signed.hash
+    )
       throw new Error("Invalid download address.");
     return signed.href;
   }

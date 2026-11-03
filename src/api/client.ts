@@ -202,6 +202,7 @@ export class KenkuiServerClient {
     onSnapshot?: (job: JobResponse) => void,
     onConnection?: (
       state: "connected" | "reconnecting" | "disconnected",
+      cause?: unknown,
     ) => void,
     cursor?: { lastEventId: string; onCursor(id: string): void },
   ): JobEventStream {

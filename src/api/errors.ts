@@ -19,3 +19,8 @@ export async function asApiError(response: Response): Promise<KenkuiApiError> {
   try { body = await response.json() as ErrorResponse; } catch { /* non-JSON error */ }
   return new KenkuiApiError(response.status, response.statusText || "Request failed", body);
 }
+
+export function isTransientRequestError(cause: unknown): boolean {
+  return cause instanceof TypeError || (cause instanceof KenkuiApiError &&
+    (cause.status === 408 || cause.status === 429 || cause.status >= 500));
+}

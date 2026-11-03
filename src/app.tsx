@@ -64,7 +64,11 @@ export function App({
       checking = true;
       try {
         if (!capabilities) {
-          capabilities = await client.capabilities();
+          const advertised = await client.capabilities();
+          capabilities = {
+            ...advertised,
+            auth: { ...advertised.auth, mode: advertised.auth?.mode ?? "none" },
+          };
           if (!live) return;
           setCap(capabilities);
         }
@@ -89,10 +93,14 @@ export function App({
         checking = false;
       }
     };
-    const offUnauthorized = client.onUnauthorized?.(() =>
-      unavailable(new KenkuiApiError(401, "Sign in to your studio")),
+    const offUnauthorized = client.onUnauthorized?.(
+      () =>
+        capabilities?.auth?.mode === "session" &&
+        unavailable(new KenkuiApiError(401, "Sign in to your studio")),
     );
-    const offRecovery = client.onRecoveryRequired?.(unavailable);
+    const offRecovery = client.onRecoveryRequired?.((cause) => {
+      if (capabilities?.auth?.mode === "session") unavailable(cause);
+    });
     const resume = host.onResume(() => void check());
     void check();
     return () => {

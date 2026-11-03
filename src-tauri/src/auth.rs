@@ -42,13 +42,30 @@ pub fn auth_origin(value: &str) -> Result<String, String> {
 }
 
 use crate::credential_store::{CredentialStore, Owner, Record, SecretStore};
-use crate::oauth::{now, Config, Provider, VerifiedGrant, SCOPES};
+use crate::oauth::{
+    authorities, now, Authorities, Authority, Config, Provider, VerifiedGrant, SCOPES,
+};
 use std::path::PathBuf;
 
 struct Access {
-    token: String,
+    credential: RequestCredential,
     refresh: String,
     expires: u64,
+}
+/// Kept in Rust through a request. A 401 can only replay under this same login.
+#[derive(Clone)]
+pub struct RequestCredential {
+    pub token: String,
+    subject: String,
+    generation: String,
+    config: Config,
+}
+impl RequestCredential {
+    fn belongs_to(&self, record: &Record) -> bool {
+        self.generation == record.generation
+            && self.subject == record.subject
+            && self.config == record.config
+    }
 }
 #[derive(Default)]
 struct Slot {
@@ -58,6 +75,7 @@ struct Slot {
 type SessionSlot = Arc<Mutex<Slot>>;
 #[derive(Clone)]
 pub struct Sessions {
+    pins: Arc<Result<Authorities, String>>,
     store: Arc<dyn SecretStore>,
     lock_dir: Option<PathBuf>,
     slots: Arc<Mutex<HashMap<String, SessionSlot>>>,
@@ -66,18 +84,37 @@ pub struct Sessions {
 }
 impl Default for Sessions {
     fn default() -> Self {
-        Self::with_store(Arc::new(CredentialStore), None)
+        Self::with_store(
+            Arc::new(CredentialStore),
+            None,
+            option_env!("KENKUI_AUTH_AUTHORITIES").unwrap_or("[]"),
+        )
     }
 }
 impl Sessions {
-    fn with_store(store: Arc<dyn SecretStore>, lock_dir: Option<PathBuf>) -> Self {
+    fn with_store(
+        store: Arc<dyn SecretStore>,
+        lock_dir: Option<PathBuf>,
+        encoded_pins: &str,
+    ) -> Self {
         Self {
+            pins: Arc::new(authorities(encoded_pins)),
             store,
             lock_dir,
             slots: Arc::default(),
             login: Arc::default(),
             pending: Arc::default(),
         }
+    }
+    fn trusted(&self, origin: &str) -> Result<&Authority, String> {
+        self.pins
+            .as_ref()
+            .as_ref()
+            .map_err(Clone::clone)?
+            .get(origin)
+            .ok_or_else(|| {
+                "This Studio build does not trust hosted sign-in for this server.".into()
+            })
     }
     async fn slot(&self, origin: &str) -> SessionSlot {
         self.slots
@@ -103,17 +140,24 @@ impl Sessions {
         slot: &mut Slot,
         config: Config,
         grant: VerifiedGrant,
+        generation: String,
     ) -> Result<(), String> {
         let record = Record {
             api_origin: owner.origin.clone(),
             config,
+            generation,
             subject: grant.subject,
             refresh: grant.refresh,
             uncertain: false,
         };
         owner.write(&record).await?;
         slot.access = Some(Access {
-            token: grant.access,
+            credential: RequestCredential {
+                token: grant.access,
+                config: record.config,
+                subject: record.subject,
+                generation: record.generation,
+            },
             expires: grant.expires,
             refresh: record.refresh,
         });
@@ -129,8 +173,9 @@ impl Sessions {
             slot.access = None;
             return Ok(());
         };
-        if !record.uncertain {
-            let config = Config::load(client, &origin).await?;
+        let pin = self.trusted(&origin)?;
+        if !record.uncertain && pin.trusts(&record.config) {
+            let config = Config::load(client, pin).await?;
             if record.config == config {
                 slot.provider = Some(
                     previous
@@ -145,8 +190,8 @@ impl Sessions {
         &self,
         origin: &str,
         client: &reqwest::Client,
-        used: Option<&str>,
-    ) -> Result<Option<String>, String> {
+        used: Option<&RequestCredential>,
+    ) -> Result<Option<RequestCredential>, String> {
         let Some(slot) = self.slots.lock().await.get(origin).cloned() else {
             return Ok(None);
         };
@@ -159,16 +204,28 @@ impl Sessions {
             slot.access = None;
             return Ok(None);
         };
-        if record.uncertain || slot.provider.as_ref().unwrap().config != record.config {
+        if record.uncertain
+            || !self.trusted(origin)?.trusts(&record.config)
+            || slot.provider.as_ref().unwrap().config != record.config
+        {
             slot.access = None;
             return Ok(None);
+        }
+        if used.is_some_and(|original| !original.belongs_to(&record)) {
+            return Ok(None);
+        }
+        if record.generation.is_empty() {
+            // Upgrade an earlier v2 entry once, while holding the shared credential lock.
+            record.generation = random_secret()?;
+            owner.write(&record).await?;
         }
         if let Some(access) = &slot.access {
             if access.expires > now() + 60
                 && access.refresh == record.refresh
-                && used != Some(&access.token)
+                && access.credential.belongs_to(&record)
+                && used.map(|request| &request.token) != Some(&access.credential.token)
             {
-                return Ok(Some(access.token.clone()));
+                return Ok(Some(access.credential.clone()));
             }
         }
         let provider = slot.provider.as_mut().unwrap();
@@ -193,14 +250,14 @@ impl Sessions {
                 return Ok(None);
             }
         };
-        Self::install(&owner, &mut slot, record.config, grant).await?;
-        Ok(slot.access.as_ref().map(|a| a.token.clone()))
+        Self::install(&owner, &mut slot, record.config, grant, record.generation).await?;
+        Ok(slot.access.as_ref().map(|a| a.credential.clone()))
     }
     pub async fn token_for(
         &self,
         url: &reqwest::Url,
         client: &reqwest::Client,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<RequestCredential>, String> {
         if url.scheme() != "https"
             || !url.path().starts_with("/v1/")
             || url.path().starts_with("/v1/auth/native/")
@@ -215,8 +272,8 @@ impl Sessions {
         &self,
         url: &reqwest::Url,
         client: &reqwest::Client,
-        used: &str,
-    ) -> Result<Option<String>, String> {
+        used: &RequestCredential,
+    ) -> Result<Option<RequestCredential>, String> {
         self.access(&url.origin().ascii_serialization(), client, Some(used))
             .await
     }
@@ -235,7 +292,7 @@ impl Sessions {
     ) -> Result<(), String> {
         let origin = auth_origin(origin)?;
         self.sign_in_with(&origin, SIGN_IN_TIMEOUT, async {
-            let config = Config::load(client, &origin).await?;
+            let config = Config::load(client, self.trusted(&origin)?).await?;
             let mut provider = Provider::new(config);
             let grant = browser_grant(&mut provider, client, open).await?;
             Ok((provider, grant))
@@ -276,7 +333,14 @@ impl Sessions {
         let (mut slot, owner, provider, grant) = result
             .map_err(|_| "Sign-in cancelled")?
             .map_err(|_| "Sign-in timed out; please try again")??;
-        Self::install(&owner, &mut slot, provider.config.clone(), grant).await?;
+        Self::install(
+            &owner,
+            &mut slot,
+            provider.config.clone(),
+            grant,
+            random_secret()?,
+        )
+        .await?;
         slot.provider = Some(provider);
         Ok(())
     }
@@ -289,12 +353,20 @@ impl Sessions {
         let owner = self.owner(&origin).await?;
         let revoked = match owner.read().await {
             Ok(Some(record)) => {
-                let mut provider = slot
-                    .provider
-                    .take()
-                    .filter(|p| p.config == record.config)
-                    .unwrap_or_else(|| Provider::new(record.config));
-                provider.revoke(client, &record.refresh).await.is_ok()
+                // Reuse validated live config, or bootstrap against the pin on cold logout.
+                let revoke = async {
+                    let pin = self.trusted(&origin)?;
+                    if !pin.trusts(&record.config) {
+                        return Err("Saved sign-in authority changed".to_string());
+                    }
+                    let mut provider =
+                        match slot.provider.take().filter(|p| p.config == record.config) {
+                            Some(provider) => provider,
+                            None => Provider::new(Config::load(client, pin).await?),
+                        };
+                    provider.revoke(client, &record.refresh).await
+                };
+                revoke.await.is_ok()
             }
             Ok(None) => true,
             Err(_) => false,

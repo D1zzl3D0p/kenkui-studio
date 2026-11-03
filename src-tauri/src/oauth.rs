@@ -44,10 +44,53 @@ fn checked_https(value: &str) -> Result<Url, String> {
     Ok(url)
 }
 
+/// Build-provided public authorities. Never deserialize pins from an API response.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Authority {
+    api_origin: String,
+    issuer: String,
+    jwks_url: String,
+    client_id: String,
+    resource: String,
+}
+pub type Authorities = std::collections::HashMap<String, Authority>;
+pub fn authorities(encoded: &str) -> Result<Authorities, String> {
+    let entries: Vec<Authority> = serde_json::from_str(encoded).map_err(|_| INVALID)?;
+    let mut map = Authorities::new();
+    let mut issuers = std::collections::HashSet::new();
+    for entry in entries {
+        let issuer = checked_https(&entry.issuer)?;
+        checked_https(&entry.jwks_url)?;
+        if crate::auth::auth_origin(&entry.api_origin)? != entry.api_origin
+            || entry.resource != entry.api_origin
+            || issuer.path().ends_with('/')
+            || entry.client_id.trim().is_empty()
+            || !issuers.insert(issuer.origin().ascii_serialization())
+            || map.contains_key(&entry.api_origin)
+        {
+            return Err(INVALID.into());
+        }
+        map.insert(entry.api_origin.clone(), entry);
+    }
+    Ok(map)
+}
+impl Authority {
+    pub fn trusts(&self, config: &Config) -> bool {
+        self.issuer == config.issuer
+            && self.jwks_url == config.jwks_url
+            && self.resource == config.resource
+            && self.client_id == config.client_id
+    }
+}
 impl Config {
-    pub async fn load(client: &Client, origin: &str) -> Result<Self, String> {
-        let config: Self = json(client.get(format!("{origin}/v1/auth/native/config"))).await?;
+    pub async fn load(client: &Client, pin: &Authority) -> Result<Self, String> {
+        let config: Self =
+            json(client.get(format!("{}/v1/auth/native/config", pin.api_origin))).await?;
         config.validate()?;
+        if !pin.trusts(&config) {
+            return Err("The server sign-in configuration does not match this Studio build".into());
+        }
         Ok(config)
     }
     pub(super) fn validate(&self) -> Result<(), String> {
@@ -134,6 +177,8 @@ struct Claims {
     sub: String,
     exp: u64,
     iat: u64,
+    #[serde(default)]
+    nbf: u64,
     client_id: String,
     #[serde(rename = "isAnonymous", default)]
     anonymous: bool,
@@ -248,7 +293,8 @@ impl Provider {
         let claims = decode::<Claims>(token, &key, &validation)
             .map_err(|_| INVALID_TOKEN)?
             .claims;
-        if claims.exp <= now()
+        if claims.nbf > now()
+            || claims.exp <= now()
             || claims.iat > now()
             || claims.iat >= claims.exp
             || claims.sub.trim().is_empty()
@@ -358,6 +404,10 @@ pub(super) mod fixture {
             ("banned", json!(true)),
             ("isAnonymous", json!(true)),
             ("iat", Value::Null),
+            ("nbf", Value::Null),
+            ("nbf", json!("invalid")),
+            ("nbf", json!(-1)),
+            ("nbf", json!(1e100)),
         ] {
             let mut c = claims();
             c[name] = bad;
@@ -400,6 +450,33 @@ pub(super) mod fixture {
             let keys = serde_json::from_value(serde_json::json!({"keys":[invalid]})).unwrap();
             assert!(p.verify(&valid, "synthetic", &keys).is_err());
         }
+    }
+    #[test]
+    fn recipient_and_signing_authorities_are_independently_pinned() {
+        let entry = json!({"apiOrigin":ORIGIN,"issuer":ISSUER,"resource":ORIGIN,"clientId":"desktop-public","jwksUrl":format!("{ISSUER}/jwks")});
+        let pins = authorities(&json!([entry]).to_string()).unwrap();
+        let pin = pins.get(ORIGIN).unwrap();
+        assert!(pin.trusts(&config()));
+        assert!(pins.get("https://attacker.test").is_none());
+        let mut wrong = config();
+        wrong.issuer = "https://auth.test/another/auth".into();
+        assert!(!pin.trusts(&wrong));
+        let mut other = entry.clone();
+        other["apiOrigin"] = json!("https://custom.test");
+        other["resource"] = other["apiOrigin"].clone();
+        // Another branch on the same host mints browser credentials for the same issuer origin.
+        other["issuer"] = json!("https://auth.test/other/auth");
+        assert!(authorities(&json!([entry, other]).to_string()).is_err());
+        assert!(authorities(&json!([entry, entry]).to_string()).is_err());
+        let mut cross = entry.clone();
+        cross["resource"] = json!("https://other.test");
+        assert!(authorities(&json!([cross]).to_string()).is_err());
+        let mut wrong = config();
+        wrong.jwks_url = "https://other.test/keys".into();
+        assert!(!pin.trusts(&wrong));
+        let mut wrong = config();
+        wrong.client_id = "another-client".into();
+        assert!(!pin.trusts(&wrong));
     }
     #[test]
     fn discovery_cannot_redirect_credentials_to_another_origin_or_branch() {

@@ -71,6 +71,14 @@ it("waits for explicit recovery then reopens the original owner's books and cred
 it("uses the pinned managed SDK for request-time Bearers, social login and managed logout", async () => {
   const { browserSession } = await import("../src/auth/neon");
   const { KenkuiServerClient } = await import("../src/api/client");
+  const authority = {
+    apiOrigin: "https://api.test",
+    issuer: "https://auth.test/db/auth",
+    clientId: "desktop",
+    jwksUrl: "https://auth.test/db/auth/jwks",
+    resource: "https://api.test",
+  };
+  vi.stubEnv("VITE_KENKUI_AUTH_AUTHORITIES", JSON.stringify([authority]));
   const calls: { url: string; init?: RequestInit }[] = [];
   const fetcher: typeof fetch = async (input, init) => {
     const url = String(input);
@@ -78,7 +86,7 @@ it("uses the pinned managed SDK for request-time Bearers, social login and manag
     if (url.endsWith("/native/config"))
       return Response.json({
         protocolVersion: 2,
-        issuer: "https://auth.test/db/auth",
+        ...authority,
       });
     if (url.includes("/get-session"))
       return Response.json(
@@ -152,6 +160,7 @@ it("uses the pinned managed SDK for request-time Bearers, social login and manag
   } finally {
     visibility.mockRestore();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   }
 });
 
@@ -189,4 +198,108 @@ it("clears the account UI when a protected request reports expired auth", async 
     await screen.findByRole("button", { name: "Continue with GitHub" }),
   ).toBeVisible();
   expect(screen.queryByRole("heading", { name: "Your books" })).toBeNull();
+});
+
+it.each(["web", "desktop"] as const)(
+  "honors default local auth on %s without auth or session requests",
+  async (platform) => {
+    for (const optional of [{}, { auth: {} }]) {
+      const configFetch = vi.fn();
+      const invoke = vi.fn();
+      const auth =
+        platform === "web"
+          ? (await import("../src/auth/neon")).browserSession(
+              "http://127.0.0.1:8050",
+              configFetch,
+            ).auth
+          : (await import("../src/host/native-auth")).createNativeAuth(invoke);
+      const restore = vi.spyOn(auth, "restore");
+      const host = fakeHost({ platform, auth });
+      const session = vi
+        .fn()
+        .mockRejectedValue(Error("unwanted session lookup"));
+      const api = {
+        capabilities: async () => ({ apiVersion: "1", ...optional }),
+        storageScope: () => "http://127.0.0.1:8050",
+        session,
+        jobs: async () => ({ items: [] }),
+        voices: async () => ({ items: [] }),
+      };
+      const view = render(
+        <App client={api as unknown as KenkuiServerClient} host={host} />,
+      );
+      expect(
+        await screen.findByRole("heading", { name: "Your books" }),
+      ).toBeVisible();
+      expect(restore).not.toHaveBeenCalled();
+      expect(configFetch).not.toHaveBeenCalled();
+      expect(invoke).not.toHaveBeenCalled();
+      expect(session).not.toHaveBeenCalled();
+      view.unmount();
+    }
+  },
+);
+
+it("refuses an issuer copied from another environment even with the selected API as resource", async () => {
+  const { browserSession } = await import("../src/auth/neon");
+  const recipient = "https://other-api.test";
+  const authority = {
+    apiOrigin: recipient,
+    issuer: "https://other-auth.test/db/auth",
+    jwksUrl: "https://other-auth.test/db/auth/jwks",
+    clientId: "other-client",
+    resource: recipient,
+  };
+  vi.stubEnv("VITE_KENKUI_AUTH_AUTHORITIES", JSON.stringify([authority]));
+  const fetcher = vi.fn(async () =>
+    Response.json({
+      ...authority,
+      issuer: "https://production-auth.test/db/auth",
+      protocolVersion: 2,
+    }),
+  );
+  const getSession = vi.fn(async () => ({ data: { session: {} } }));
+  const create = vi.fn(() => ({ getSession }));
+  try {
+    const session = browserSession(recipient, fetcher, create as never);
+    await expect(session.auth.restore("")).rejects.toThrow();
+    expect(create).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+it("rejects incomplete or ambiguous release authorities before making any discovery request", async () => {
+  const { browserSession } = await import("../src/auth/neon");
+  const pin = {
+    apiOrigin: "https://api.test",
+    issuer: "https://auth.test/db/auth",
+    jwksUrl: "https://auth.test/db/auth/jwks",
+    clientId: "desktop",
+    resource: "https://api.test",
+  };
+  const other = {
+    ...pin,
+    apiOrigin: "https://other.test",
+    resource: "https://other.test",
+    issuer: "https://auth.test/other/auth",
+  };
+  try {
+    for (const entries of [
+      [],
+      [pin, pin],
+      [pin, other],
+      [{ ...pin, resource: other.resource }],
+      [{ ...pin, jwksUrl: "http://auth.test/jwks" }],
+    ]) {
+      vi.stubEnv("VITE_KENKUI_AUTH_AUTHORITIES", JSON.stringify(entries));
+      const fetcher = vi.fn();
+      const session = browserSession(pin.apiOrigin, fetcher);
+      await expect(session.auth.signIn("", "google")).rejects.toThrow();
+      expect(fetcher).not.toHaveBeenCalled();
+    }
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

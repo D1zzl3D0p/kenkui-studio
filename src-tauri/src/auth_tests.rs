@@ -85,10 +85,13 @@ fn secure_origins_and_pkce() {
         "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
     );
 }
+fn pins() -> String {
+    serde_json::json!([{"apiOrigin":ORIGIN,"issuer":ISSUER,"resource":ORIGIN,"jwksUrl":format!("{ISSUER}/jwks"),"clientId":"desktop-public"}]).to_string()
+}
 async fn prepared(endpoint: &str) -> (Sessions, Arc<MemoryStore>, tempfile::TempDir) {
     let temp = tempfile::tempdir().unwrap();
     let store = Arc::new(MemoryStore::default());
-    let sessions = Sessions::with_store(store.clone(), Some(temp.path().into()));
+    let sessions = Sessions::with_store(store.clone(), Some(temp.path().into()), &pins());
     let slot = sessions.slot(ORIGIN).await;
     let mut slot = slot.lock().await;
     slot.provider = Some(provider(endpoint));
@@ -102,6 +105,7 @@ async fn prepared(endpoint: &str) -> (Sessions, Arc<MemoryStore>, tempfile::Temp
             subject: "owner".into(),
             expires: now() + 300,
         },
+        random_secret().unwrap(),
     )
     .await
     .unwrap();
@@ -146,13 +150,14 @@ async fn concurrent_401_uses_one_rotation_and_scopes_credentials() {
     }
     let send = tokio::spawn(response(listener, store.clone(), grant("owner")));
     let url = format!("{ORIGIN}/v1/jobs").parse().unwrap();
+    let original = sessions.token_for(&url, &client).await.unwrap().unwrap();
     let (one, two) = tokio::join!(
-        sessions.refresh_after_unauthorized(&url, &client, "old-access"),
-        sessions.refresh_after_unauthorized(&url, &client, "old-access")
+        sessions.refresh_after_unauthorized(&url, &client, &original),
+        sessions.refresh_after_unauthorized(&url, &client, &original)
     );
     let one = one.unwrap().unwrap();
-    assert_eq!(Some(one.clone()), two.unwrap());
-    assert_ne!(one, "old-access");
+    assert_eq!(one.token, two.unwrap().unwrap().token);
+    assert_ne!(one.token, "old-access");
     let request = send.await.unwrap();
     for field in [
         "POST /token",
@@ -164,7 +169,7 @@ async fn concurrent_401_uses_one_rotation_and_scopes_credentials() {
         assert!(request.contains(field));
     }
     let saved = store.read(ORIGIN).unwrap().unwrap();
-    assert!(!saved.contains(&one));
+    assert!(!saved.contains(&one.token));
     assert!(saved.contains("rotated"));
 }
 #[tokio::test]
@@ -181,14 +186,15 @@ async fn uncertain_rotation_survives_restart_and_cannot_replay() {
         let send = tokio::spawn(response(listener, store.clone(), body));
         let client = crate::http::client().unwrap();
         let url = format!("{ORIGIN}/v1/jobs").parse().unwrap();
+        let original = sessions.token_for(&url, &client).await.unwrap().unwrap();
         assert!(sessions
-            .refresh_after_unauthorized(&url, &client, "old-access")
+            .refresh_after_unauthorized(&url, &client, &original)
             .await
             .ok()
             .flatten()
             .is_none());
         send.await.unwrap();
-        let restarted = Sessions::with_store(store.clone(), Some(dir.path().into()));
+        let restarted = Sessions::with_store(store.clone(), Some(dir.path().into()), &pins());
         restarted.restore(ORIGIN, &client).await.unwrap();
         assert!(restarted.token_for(&url, &client).await.unwrap().is_none());
         assert!(
@@ -206,8 +212,9 @@ async fn marker_failure_prevents_post_and_fresh_install_skips_network() {
     store.fail_marker.store(true, Ordering::SeqCst);
     let client = crate::http::client().unwrap();
     let url = format!("{ORIGIN}/v1/jobs").parse().unwrap();
+    let original = sessions.token_for(&url, &client).await.unwrap().unwrap();
     assert!(sessions
-        .refresh_after_unauthorized(&url, &client, "old-access")
+        .refresh_after_unauthorized(&url, &client, &original)
         .await
         .is_err());
     assert!(
@@ -331,7 +338,11 @@ async fn real_loopback_pkce_and_attempt_cleanup() {
 #[tokio::test]
 async fn cancel_timeout_and_logout_invalidate_pending_start() {
     let dir = tempfile::tempdir().unwrap();
-    let sessions = Sessions::with_store(Arc::new(MemoryStore::default()), Some(dir.path().into()));
+    let sessions = Sessions::with_store(
+        Arc::new(MemoryStore::default()),
+        Some(dir.path().into()),
+        &pins(),
+    );
     for action in ["cancel", "logout", "timeout"] {
         let s = sessions.clone();
         let (started, ready) = tokio::sync::oneshot::channel();
@@ -399,4 +410,140 @@ async fn signout_revokes_the_stored_refresh_and_clears_even_on_remote_failure() 
             .unwrap()
             .is_none());
     }
+}
+
+#[tokio::test]
+async fn delayed_401_cannot_replay_after_another_login() {
+    for next_subject in ["other-owner", "owner"] {
+        let (sessions, store, temp) = prepared("https://unused.invalid").await;
+        let client = crate::http::client().unwrap();
+        let url = format!("{ORIGIN}/v1/jobs").parse().unwrap();
+        let original = sessions.token_for(&url, &client).await.unwrap().unwrap();
+        // Another process replaced the login, even if the subject happened to sign in again.
+        let other = Sessions::with_store(store, Some(temp.path().into()), &pins());
+        let slot = other.slot(ORIGIN).await;
+        let mut slot = slot.lock().await;
+        Sessions::install(
+            &other.owner(ORIGIN).await.unwrap(),
+            &mut slot,
+            config(),
+            VerifiedGrant {
+                access: "different-login".into(),
+                refresh: "other-refresh".into(),
+                subject: next_subject.into(),
+                expires: now() + 300,
+            },
+            random_secret().unwrap(),
+        )
+        .await
+        .unwrap();
+        drop(slot);
+        assert!(sessions
+            .refresh_after_unauthorized(&url, &client, &original)
+            .await
+            .unwrap()
+            .is_none());
+    }
+}
+
+#[tokio::test]
+async fn copied_config_and_persisted_foreign_authority_never_authorize_the_recipient() {
+    let (sessions, store, temp) = prepared("https://unused.invalid").await;
+    let client = crate::http::client().unwrap();
+    let foreign = "https://attacker.test";
+    let err = sessions
+        .sign_in(foreign, &client, |_| {
+            panic!("browser opened for untrusted origin")
+        })
+        .await
+        .unwrap_err();
+    assert!(err.contains("does not trust"));
+    let configured=serde_json::json!([{"apiOrigin":foreign,"issuer":"https://other.test/db/auth","resource":foreign,
+        "clientId":"another-public-client","jwksUrl":"https://other.test/db/auth/jwks"}]).to_string();
+    let other = Sessions::with_store(store.clone(), Some(temp.path().into()), &configured);
+    let owner = other.owner(foreign).await.unwrap();
+    let slot = other.slot(foreign).await;
+    let mut slot = slot.lock().await;
+    slot.provider = Some(provider("https://unused.invalid"));
+    // Simulate an entry installed by a build that trusted the copied Kenkui config.
+    Sessions::install(
+        &owner,
+        &mut slot,
+        config(),
+        VerifiedGrant {
+            access: "do-not-send".into(),
+            refresh: "do-not-revoke".into(),
+            subject: "owner".into(),
+            expires: now() + 300,
+        },
+        random_secret().unwrap(),
+    )
+    .await
+    .unwrap();
+    drop(slot);
+    drop(owner);
+    assert!(other
+        .token_for(&format!("{foreign}/v1/jobs").parse().unwrap(), &client)
+        .await
+        .unwrap()
+        .is_none());
+    other.restore(foreign, &client).await.unwrap();
+    assert!(!other.sign_out(foreign, &client).await.unwrap());
+    assert!(store.read(foreign).unwrap().is_none());
+}
+
+#[tokio::test]
+async fn protected_post_is_never_sent_twice_across_an_account_switch() {
+    let (sessions, store, temp) = prepared("https://unused.invalid").await;
+    let other = Sessions::with_store(store, Some(temp.path().into()), &pins());
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let transport = format!("http://{}/v1/jobs", listener.local_addr().unwrap());
+    let backend = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut bytes = [0; 8192];
+        let count = socket.read(&mut bytes).await.unwrap();
+        assert!(String::from_utf8_lossy(&bytes[..count])
+            .to_ascii_lowercase()
+            .contains("authorization: bearer old-access"));
+        let slot = other.slot(ORIGIN).await;
+        let mut slot = slot.lock().await;
+        Sessions::install(
+            &other.owner(ORIGIN).await.unwrap(),
+            &mut slot,
+            config(),
+            VerifiedGrant {
+                access: "other-account-access".into(),
+                refresh: "other-refresh".into(),
+                subject: "other-owner".into(),
+                expires: now() + 300,
+            },
+            random_secret().unwrap(),
+        )
+        .await
+        .unwrap();
+        drop(slot);
+        socket
+            .write_all(
+                b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), listener.accept())
+                .await
+                .is_err()
+        );
+    });
+    let client = crate::http::client().unwrap();
+    // Exercise the real send/retry boundary with an in-process HTTP backend and the trusted logical recipient.
+    let response = crate::http::authenticated_send(
+        &client,
+        &sessions,
+        &format!("{ORIGIN}/v1/jobs").parse().unwrap(),
+        client.post(transport).body("synthetic mutation"),
+    )
+    .await
+    .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
+    backend.await.unwrap();
 }

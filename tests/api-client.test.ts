@@ -218,3 +218,20 @@ it("reconnects authenticated fetch SSE with the exact durable sequence and a cur
     stream.close();
   }
 });
+
+it("stops a disconnected stream if its recovery snapshot is permanently unavailable",async()=>{
+  const {KenkuiApiError}=await import("../src/api/errors");
+  vi.useFakeTimers();
+  try{
+    const cause=new KenkuiApiError(404,"Missing job");
+    const getJob=vi.fn().mockRejectedValue(cause), connection=vi.fn();
+    const client=new KenkuiServerClient("https://api.test",{getJob,eventSource:FakeEventSource});
+    client.events("book",undefined,undefined,connection);
+    const source=FakeEventSource.last;
+    source.onerror?.(new Event("error"));
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(connection).toHaveBeenLastCalledWith("disconnected",cause);
+    expect(getJob).toHaveBeenCalledOnce();
+    expect(FakeEventSource.last).toBe(source);
+  }finally{vi.useRealTimers();}
+});
