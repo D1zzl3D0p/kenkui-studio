@@ -1,93 +1,10 @@
-import type { BookResponse, JobRequest } from "../api/generated/v1";
-export const defaultSpeechSettings = {
-  chapterPauses: true,
-  prepareNumbers: true,
-  pronunciationCorrections: true,
-  stutterHandling: false,
-};
-export type SpeechSettings = typeof defaultSpeechSettings;
-/** What a new draft starts with. An existing draft keeps what it stored. */
-export const defaultPauseLengths = {
-  chapterPauseMs: "1500",
-  scenePauseMs: "1000",
-  headingBeforePauseMs: "0",
-  headingAfterPauseMs: "0",
-  paragraphPauseMs: "0",
-  linePauseMs: "0",
-};
-export type PauseLengths = typeof defaultPauseLengths;
-/** Which of these a server will actually apply. Absent means an older server. */
-export type SettingsSupport = {
-  speechSettings?: boolean;
-  pauseLengths?: boolean;
-  scenePauses?: boolean;
-  spokenChapterTitles?: boolean;
-};
-const everySetting: SettingsSupport = {
-  speechSettings: true,
-  pauseLengths: true,
-  scenePauses: true,
-  spokenChapterTitles: true,
-};
-/** Tiers this draft may send, in the order a reader meets them. */
-export function pauseFieldsFor(support: SettingsSupport): (keyof PauseLengths)[] {
-  const keys = Object.keys(defaultPauseLengths) as (keyof PauseLengths)[];
-  return support.scenePauses ? keys : keys.filter((key) => key !== "scenePauseMs");
-}
-export function validPauseLength(value: string): boolean {
-  return /^\d+$/.test(value.trim()) && Number(value) <= 60_000;
-}
-// A tier a draft never stored was never chosen for it, so it reads as off.
-// Filling from the new-draft defaults would hand old work a pause it never
-// asked for, and the draft would render differently than when it was saved.
-const noPauses = Object.fromEntries(
-  Object.keys(defaultPauseLengths).map((key) => [key, "0"]),
-) as PauseLengths;
-export function pauseLengthsFor(d: Pick<Draft, "pauseLengths" | "speechSettings">): PauseLengths {
-  if (d.pauseLengths) return { ...noPauses, ...d.pauseLengths };
-  return {
-    ...noPauses,
-    chapterPauseMs: d.speechSettings?.chapterPauses ? "1500" : "0",
-  };
-}
-export type ChapterTitles = { enabled: boolean; pauseMs: string; overrides: { [chapterId: string]: string | null } };
-export const defaultChapterTitles: ChapterTitles = { enabled: true, pauseMs: "750", overrides: {} };
-export function chapterTitlesFor(d: Pick<Draft, "chapterTitles">): ChapterTitles {
-  return d.chapterTitles ?? { enabled: false, pauseMs: "750", overrides: {} };
-}
-export type Draft = {
-  chapterTitles?: ChapterTitles;
-  pauseLengths?: PauseLengths;
-  speechSettings?: SpeechSettings;
-  id: string;
-  book: BookResponse;
-  originalSourceId: string;
-  title: string;
-  author: string;
-  chapters: string[];
-  narrator: string;
-  mode: "single" | "characters";
-  model: string;
-  unknown: string;
-  method: string;
-  format: string;
-  sourceCover: boolean;
-  step: number;
-  key: string;
-  updated: number;
-};
-export type Record = {
-  id: string;
-  sourceId: string;
-  title: string;
-  author: string;
-  narrator: string;
-  sourceCover: boolean;
-};
-export type Library = { drafts: Draft[]; records: Record[] };
-export const uid = () =>
-  globalThis.crypto?.randomUUID?.() ??
-  `studio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+import type { JobRequest } from "../api/generated/v1";
+import { chapterTitlesFor, pauseFieldsFor, pauseLengthsFor, uid, validPauseLength, type Draft, type SettingsSupport } from "./draft-model";
+export * from "./draft-model";
+export { readLibrary, saveLibrary } from "./draft-storage";
+
+const everySetting: SettingsSupport = { speechSettings: true, pauseLengths: true, scenePauses: true, spokenChapterTitles: true };
+
 export function requestFor(d: Draft, support: SettingsSupport = everySetting): JobRequest {
   const pauseLengths = d.pauseLengths && pauseLengthsFor(d);
   const titles = chapterTitlesFor(d);
@@ -130,57 +47,4 @@ export function changeDraft(d: Draft, patch: Partial<Draft>): Draft {
   if (JSON.stringify(requestFor(d)) !== JSON.stringify(requestFor(next)))
     next.key = uid();
   return next;
-}
-export function readLibrary(key: string): Library {
-  try {
-    const raw = JSON.parse(localStorage.getItem(key) || "null");
-    if (!raw || !Array.isArray(raw.drafts) || !Array.isArray(raw.records))
-      return { drafts: [], records: [] };
-    return {
-      drafts: raw.drafts.filter(
-        (d: Draft) =>
-          d &&
-          typeof d.id === "string" &&
-          typeof d.book?.sourceId === "string" &&
-          Array.isArray(d.book.chapters) &&
-          Array.isArray(d.chapters) &&
-          typeof d.key === "string" &&
-          typeof d.title === "string" &&
-          typeof d.author === "string" &&
-          typeof d.narrator === "string" &&
-          typeof d.format === "string" &&
-          typeof d.model === "string" &&
-          typeof d.method === "string" &&
-          typeof d.unknown === "string" &&
-          typeof d.originalSourceId === "string" &&
-          (d.chapterTitles === undefined ||
-            (d.chapterTitles !== null && typeof d.chapterTitles.enabled === "boolean" &&
-             typeof d.chapterTitles.pauseMs === "string" && d.chapterTitles.overrides !== null &&
-             typeof d.chapterTitles.overrides === "object" && !Array.isArray(d.chapterTitles.overrides) &&
-             Object.values(d.chapterTitles.overrides).every(v => v === null || typeof v === "string"))) &&
-          (d.pauseLengths === undefined ||
-            (typeof d.pauseLengths === "object" && d.pauseLengths !== null &&
-              Object.values(d.pauseLengths).every(
-                (value) => typeof value === "string",
-              ))) &&
-          (d.speechSettings === undefined ||
-            (d.speechSettings !== null &&
-              Object.keys(defaultSpeechSettings).every(
-                (key) => typeof d.speechSettings?.[key as keyof SpeechSettings] === "boolean",
-              ))) &&
-          [1, 2, 3].includes(d.step) &&
-          d.book.chapters.every(
-            (c) => c && typeof c.id === "string" && typeof c.title === "string",
-          ) &&
-          d.chapters.every((c) => typeof c === "string") &&
-          ["single", "characters"].includes(d.mode),
-      ),
-      records: raw.records.filter(
-        (r: Record) =>
-          r && typeof r.id === "string" && typeof r.title === "string",
-      ),
-    };
-  } catch {
-    return { drafts: [], records: [] };
-  }
 }
