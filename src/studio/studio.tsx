@@ -1,3 +1,4 @@
+import { useLibrary } from "./use-library";
 import { isTransientRequestError } from "../api/errors";
 import { useEffect, useRef, useState } from "react";
 import type { KenkuiServerClient } from "../api/client";
@@ -20,7 +21,6 @@ import {
   defaultSpeechSettings,
   defaultChapterTitles,
   defaultPauseLengths,
-  readLibrary,
   uid,
   type Draft,
   type Record,
@@ -48,7 +48,7 @@ export function Studio({
   initialPath?: string;
 }) {
   const key = `kenkui-studio-library-v1:${scope}`;
-  const [library, setLibrary] = useState(() => readLibrary(key));
+  const { library, setLibrary, savingError } = useLibrary(key);
   const [path, setPath] = useState(initialPath || window.location.pathname);
   const [voices, setVoices] = useState<VoiceResponse[]>([]),
     [jobs, setJobs] = useState<JobResponse[]>();
@@ -57,8 +57,7 @@ export function Studio({
   const [error, setError] = useState<unknown>(),
     [jobsError, setJobsError] = useState<unknown>(),
     [voiceError, setVoiceError] = useState<unknown>();
-  const [savingError, setSavingError] = useState(""),
-    [busy, setBusy] = useState(false),
+  const [busy, setBusy] = useState(false),
     [refresh, setRefresh] = useState(0);
   const [selected, setSelected] = useState<{
     type: "draft" | "job";
@@ -90,16 +89,6 @@ export function Studio({
       /* theme remains usable */
     }
   }, [theme]);
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(library));
-      setSavingError("");
-    } catch {
-      setSavingError(
-        "This browser could not save your draft. Keep this tab open until you finish.",
-      );
-    }
-  }, [key, library]);
   useEffect(() => {
     const sync = () => setPath(window.location.pathname);
     window.addEventListener("popstate", sync);

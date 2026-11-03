@@ -1,4 +1,4 @@
-import { isTransientRequestError } from "../api/errors";
+import { useJobTracking } from "./use-job-tracking";
 import { useEffect, useRef, useState } from "react";
 import type { KenkuiServerClient } from "../api/client";
 import type { Capabilities, JobResponse } from "../api/generated/v1";
@@ -43,142 +43,8 @@ export function JobView({
       alive.current = false;
     };
   }, []);
-  const [job, setJob] = useState<JobResponse>(),
-    [error, setError] = useState<unknown>();
-  const [connection, setConnection] = useState("connected"),
-    [reload, setReload] = useState(0);
-  const stopTracking = useRef<() => void>(() => {});
-  const [busy, setBusy] = useState(false),
-    [audio, setAudio] = useState<string>();
-  useEffect(() => {
-    let live = true,
-      generation = 0,
-      finished = false,
-      lastEventId = "";
-    let stream: ReturnType<KenkuiServerClient["events"]> | undefined;
-    let poll: ReturnType<typeof setTimeout> | undefined;
-    let fetching = false,
-      failures = 0;
-    setError(undefined);
-    setJob(undefined);
-    setConnection("connected");
-    const stop = () => {
-      clearTimeout(poll);
-      stream?.close();
-      stream = undefined;
-    };
-    stopTracking.current = () => {
-      finished = true;
-      generation++;
-      stop();
-    };
-    const update = (snapshot: JobResponse) => {
-      if (!live) return;
-      failures = 0;
-      setError(undefined);
-      setJob(snapshot);
-      if (terminal.has(snapshot.status)) {
-        finished = true;
-        stop();
-      }
-    };
-    const schedule = () => {
-      clearTimeout(poll);
-      if (live && !finished && document.visibilityState === "visible")
-        poll = setTimeout(() => void refresh(), 5000);
-    };
-    const refresh = async () => {
-      if (
-        fetching ||
-        !live ||
-        finished ||
-        document.visibilityState !== "visible"
-      )
-        return;
-      fetching = true;
-      const current = generation;
-      try {
-        const snapshot = await client.getJob(id);
-        if (!live || current !== generation) return;
-        update(snapshot);
-        if (finished) return;
-        try {
-          stream = client.events(
-            id,
-            (event) => {
-              if (!live || current !== generation) return;
-              const state = (
-                {
-                  completed: "succeeded",
-                  failed: "failed",
-                  cancelled: "cancelled",
-                  cancel_requested: "cancel_requested",
-                } as const
-              )[event.type as "completed"];
-              setJob((job) => ({
-                ...job,
-                id,
-                status: state || job?.status || "running",
-                progress: event.progress,
-              }));
-            },
-            update,
-            (state,cause) => {
-              if (!live || current !== generation) return;
-              setConnection(state);
-              if (state === "disconnected") {
-                stop();
-                if (cause && !isTransientRequestError(cause)) {
-                  setError(cause);
-                  stopTracking.current();
-                } else schedule();
-              }
-            },
-            {
-              lastEventId,
-              onCursor: (value) => {
-                lastEventId = value;
-              },
-            },
-          );
-        } catch {
-          // The snapshot established active work even if SSE is unavailable.
-          setConnection("disconnected");
-          schedule();
-        }
-      } catch (cause) {
-        if (live && current === generation) {
-          setConnection("disconnected");
-          setError(cause);
-          if (isTransientRequestError(cause) && ++failures <= 3) schedule();
-          else stopTracking.current();
-        }
-      } finally {
-        if (current === generation) fetching = false;
-      }
-    };
-    const pause = () => {
-      generation++;
-      fetching = false;
-      stop();
-    };
-    const hidden = () => {
-      if (document.visibilityState !== "visible") pause();
-    };
-    document.addEventListener("visibilitychange", hidden);
-    const off = host.onResume(() => {
-      if (fetching || finished) return;
-      pause();
-      void refresh();
-    });
-    void refresh();
-    return () => {
-      live = false;
-      pause();
-      off();
-      document.removeEventListener("visibilitychange", hidden);
-    };
-  }, [id, client, host, reload]);
+  const { job, setJob, error, setError, connection, retry, stop } = useJobTracking({ id, client, host });
+  const [busy, setBusy] = useState(false), [audio, setAudio] = useState<string>();
   useEffect(() => {
     if (job && terminal.has(job.status)) onChanged();
   }, [job?.status]); // caller only refreshes snapshots/balance
@@ -250,7 +116,7 @@ export function JobView({
         <section className="editor">
           <ErrorMessage error={error} />
           {!job ? (
-            error ? <button className="secondary" onClick={() => setReload(n => n+1)}>Retry job</button> : <p role="status">Loading conversion…</p>
+            error ? <button className="secondary" onClick={retry}>Retry job</button> : <p role="status">Loading conversion…</p>
           ) : (
             <>
               <div className="eyebrow">{statusLabel(job.status)}</div>
@@ -278,7 +144,7 @@ export function JobView({
                     : "Progress updates disconnected."}
                   <button
                     className="text-button"
-                    onClick={() => setReload((n) => n + 1)}
+                    onClick={retry}
                   >
                     Refresh updates
                   </button>
@@ -312,7 +178,7 @@ export function JobView({
                       setBusy(true);
                       try {
                         const cancelled = await client.cancelJob(id);
-                        if (terminal.has(cancelled.status)) stopTracking.current();
+                        if (terminal.has(cancelled.status)) stop();
                         setJob(cancelled);
                         onChanged();
                       } catch (cause) {

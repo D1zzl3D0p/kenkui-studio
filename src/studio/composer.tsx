@@ -1,3 +1,5 @@
+import { ComposerChapters } from "./composer-chapters";
+import { ComposerOutput } from "./composer-output";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KenkuiServerClient } from "../api/client";
 import type {
@@ -9,7 +11,7 @@ import type {
 } from "../api/generated/v1";
 import { ErrorMessage } from "../components/error-message";
 import { BookCover } from "./cover";
-import { chapterSummary, isLongChapter, narrationOf } from "./estimates";
+import { narrationOf } from "./estimates";
 import { ChapterTitleControls, ChapterTitleReview } from "./chapter-titles";
 import { chapterTitlesFor, requestFor, pauseFieldsFor, pauseLengthsFor, validPauseLength, type Draft } from "./store";
 import { VoicePicker, voiceInfo } from "./voice-picker";
@@ -388,59 +390,7 @@ export function Composer({
                       Cover and metadata edits do not add a surcharge.
                     </p>
                   </div>
-                  <div className="chapter-selection">
-                    <div className="section-top">
-                      <span>
-                        {d.chapters.length} of {d.book.chapters.length} chapters
-                      </span>
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          update({ chapters: d.book.chapters.map((c) => c.id) })
-                        }
-                      >
-                        Select all
-                      </button>
-                    </div>
-                    {d.book.chapters.map((c) => (
-                      <label className="checkbox chapter-row" key={c.id}>
-                        <input
-                          type="checkbox"
-                          // The label now carries a size beside the title, so the
-                          // control names itself rather than reading both out.
-                          aria-label={c.title}
-                          checked={d.chapters.includes(c.id)}
-                          onChange={(e) =>
-                            update({
-                              chapters: e.target.checked
-                                ? d.book.chapters
-                                    .filter(
-                                      (item) =>
-                                        item.id === c.id ||
-                                        d.chapters.includes(item.id),
-                                    )
-                                    .map((item) => item.id)
-                                : d.chapters.filter((id) => id !== c.id),
-                            })
-                          }
-                        />
-                        <span className="chapter-name">{c.title}</span>
-                        {chapterSummary(speechCharacters(c), narration) && (
-                          <small
-                            className={
-                              isLongChapter(speechCharacters(c), narration)
-                                ? "chapter-meta long"
-                                : "chapter-meta"
-                            }
-                          >
-                            {chapterSummary(speechCharacters(c), narration)}
-                            {isLongChapter(speechCharacters(c), narration) &&
-                              " · unusually long"}
-                          </small>
-                        )}
-                      </label>
-                    ))}
-                  </div>
+                  <ComposerChapters draft={d} update={update} narration={narration} speechCharacters={speechCharacters} />
                   <p className="quiet">
                     Selecting fewer chapters can lower the estimate. Text is
                     automatically prepared for speech. Approximate chapter durations cover speech; pauses add time.
@@ -680,24 +630,7 @@ export function Composer({
                 {!cap.speechSettings && d.speechSettings && (
                   <p role="status">This server cannot apply the saved pacing and speech preparation settings.</p>
                 )}
-                {(cap.outputFormats?.length ?? 0) > 1 && (
-                  <details data-settings-id="output">
-                    <summary>Advanced</summary>
-                    <label>
-                      Audio format
-                      <select
-                        value={d.format}
-                        onChange={(e) => update({ format: e.target.value })}
-                      >
-                        {cap.outputFormats?.map((f) => (
-                          <option key={f} value={f}>
-                            {f.toUpperCase()}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </details>
-                )}
+                <ComposerOutput draft={d} update={update} capabilities={cap} />
                 {estimate}
                 {priced && eligible && (
                   <p className="quiet">
