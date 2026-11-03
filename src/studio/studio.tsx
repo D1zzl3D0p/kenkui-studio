@@ -127,13 +127,13 @@ export function Studio({
       fetching = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let failures = 0,
-      stopped = false;
+      permanentFailure = false;
     const schedule = () => {
       if (document.visibilityState === "visible")
         timer = setTimeout(() => void load(), 15000);
     };
     const load = async () => {
-      if (stopped || fetching || document.visibilityState !== "visible") return;
+      if (permanentFailure || fetching || document.visibilityState !== "visible") return;
       clearTimeout(timer);
       fetching = true;
       try {
@@ -150,13 +150,10 @@ export function Studio({
       } catch (cause) {
         if (live) {
           setJobsError(cause);
-          if (
-            lastListHadActiveJobs.current &&
-            isTransientRequestError(cause) &&
-            ++failures <= 3
-          )
+          permanentFailure = !isTransientRequestError(cause);
+          // The retry budget governs timers. A foreground return can recheck a transient failure.
+          if (!permanentFailure && lastListHadActiveJobs.current && ++failures <= 3)
             schedule();
-          else stopped = true;
         }
       } finally {
         fetching = false;

@@ -229,3 +229,46 @@ it.each([404, 503])(
     expect(jobs).toHaveBeenCalledTimes(status === 404 ? 2 : 5);
   },
 );
+
+it.each(["empty", "terminal"])(
+  "refreshes once on foreground after the first library request fails, then leaves the %s library idle",
+  async (result) => {
+    vi.useFakeTimers();
+    const { KenkuiApiError } = await import("../src/api/errors");
+    let visible = true;
+    vi.spyOn(document, "visibilityState", "get").mockImplementation(() =>
+      visible ? "visible" : "hidden",
+    );
+    const jobs = vi
+      .fn()
+      .mockRejectedValueOnce(new KenkuiApiError(503, "Offline"))
+      .mockResolvedValue({
+        items: result === "empty" ? [] : [snapshot("succeeded")],
+      });
+    const api = {
+      storageScope: () => "same-origin",
+      capabilities: async () => cap,
+      jobs,
+      voices: async () => ({ items: [] }),
+    };
+    const view = render(
+      <App client={api as unknown as KenkuiServerClient} host={fakeHost()} />,
+    );
+    await act(() => vi.advanceTimersByTimeAsync(60000));
+    expect(view.getByRole("alert")).toHaveTextContent("Offline");
+    expect(jobs).toHaveBeenCalledOnce();
+    visible = false;
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    act(() => window.dispatchEvent(new Event("online")));
+    await act(() => vi.advanceTimersByTimeAsync(60000));
+    expect(jobs).toHaveBeenCalledOnce();
+    visible = true;
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(jobs).toHaveBeenCalledTimes(2);
+    expect(view.queryByRole("alert")).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(3600000));
+    expect(jobs).toHaveBeenCalledTimes(2);
+  },
+);
