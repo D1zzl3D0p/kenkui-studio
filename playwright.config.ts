@@ -1,3 +1,4 @@
+import { syntheticAuthority } from "./tests/e2e/capabilities";
 import { defineConfig } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +20,6 @@ export default defineConfig({
     command: `npm run build && ${process.env.KENKUI_SERVER_PYTHON ?? path.join(serverRoot, ".venv/bin/python")} tests/e2e/local-server.py`,
     url: "http://127.0.0.1:4173/v1/health",
     reuseExistingServer: false,
-    env: { KENKUI_SERVER_ROOT: serverRoot },
+    env: { KENKUI_SERVER_ROOT: serverRoot, VITE_KENKUI_AUTH_AUTHORITIES:JSON.stringify([syntheticAuthority]) },
   },
 });

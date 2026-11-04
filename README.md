@@ -26,9 +26,14 @@ npm run build
 npm run test:e2e
 ```
 
-API types are generated from `../kenkui-server/openapi/v1.json`. Regenerate the
-server artifact first with `python -m kenkui_server.export_openapi` in its uv
-environment. `src/api/generated/v1.ts` only aliases generated schemas.
+API types default to `contracts/local-api/v1.json`, frozen from server commit
+`1d63ab904147a43a5baeaac9fd27043fc4735747`, exact Git blob
+`145346870a36423bdcdaad286c153770337306f8` (checked before generation). This broader
+local schema includes spoken chapter titles; the older hosted Neon migration
+contract is frozen separately on the server. Use `KENKUI_SERVER_ROOT=/reviewed/server`
+only for an intentional schema update, regenerating that server's OpenAPI first.
+`src/api/generated/v1.ts` only aliases generated schemas. A schema snapshot does
+not change the local sidecar launcher or bundle a server/core revision.
 
 Playwright uses a deterministic server fixture. The separate server real-render
 acceptance test verifies synthesis and playable M4B output. For the complete
@@ -189,3 +194,34 @@ Cloudflare Static Assets configuration is in `wrangler.jsonc`. Run
 validate deployment, then omit `--dry-run` to publish. Use `deploy:production`
 for the production origin. See the server's `deploy/production.md` for the
 complete release sequence and account prerequisites.
+
+`release/auth-authorities.json` is the single reviewed public input.
+`scripts/release-config.mjs` validates it before either deployment/build command
+and derives both web and Rust arrays identically, including the selected native
+API origin. Staging has the actual reviewed public values; production is empty
+and official production release/deploy **fails before building/publishing** until
+its real provider/client pins are reviewed. Do not discover or guess them.
+
+Native workflow runs on PRs/main produce clearly named `local` QA artifacts,
+without hosted pins or publication. For staging QA, manually dispatch from main
+with `release_environment=staging`; every build uses the same validated staging
+pin and `VITE_KENKUI_NATIVE_API_ORIGIN`. Official targets use the corresponding
+GitHub environment; confirm required reviewers/branch restrictions separately.
+The workflow has no release-store/publication action and bundles no Python/core
+sidecar. Keep the existing local launcher unchanged. Local/no-auth builds need
+no authority. Staging deployment waits for the server's coordinated Task13
+restore/writer-freeze/readiness gate, not merely a successful build.
+
+For local staging QA use `node scripts/release-config.mjs staging -- npm run desktop:build`
+(or `build:native` for the frontend only). This sets both public pin variables
+and the native staging origin in the same build process.
+
+### Hosted sign-in trust configuration
+
+Web builds read `VITE_KENKUI_AUTH_AUTHORITIES` and Rust desktop builds read `KENKUI_AUTH_AUTHORITIES` at compile time. Supply the same public JSON array from trusted release configuration. For example, a test deployment could use:
+
+```json
+[{"apiOrigin":"https://api.example.test","issuer":"https://auth.example.test/db/auth","jwksUrl":"https://auth.example.test/db/auth/jwks","clientId":"public-desktop-client","resource":"https://api.example.test"}]
+```
+
+Use the exact HTTPS API origin (no trailing slash) as the resource and the full managed branch issuer. Each API origin and each issuer origin must be unique across the array. Pin the actual public client's ID and the branch signing-key URL. The version-2 configuration served by the selected API must agree with its compiled entry. Rebuild after changing these pins. Hosted login for an unlisted custom server requires a build that pins that deployment. Local servers advertising no authentication, including servers omitting the optional auth capability, require no pins.

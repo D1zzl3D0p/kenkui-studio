@@ -64,24 +64,24 @@ export function nativeFetch(invoke: Invoke, baseUrl: string, timeoutMs = 120_000
   };
 }
 
-export function openEventChannel(invoke: Invoke): (url: string) => EventChannel {
-  return (url) => {
+export function openEventChannel(invoke: Invoke): (url: string, cursor?: string) => EventChannel {
+  return (url, cursor) => {
     let onFrame: (frame: EventFrame) => void = () => undefined;
     let onError: () => void = () => undefined;
     let closed = false;
     let streamId: number | undefined;
     const channel = new Channel<
-      { kind: "event"; event: string; data: string } | { kind: "error"; message: string }
+      { kind: "event"; event: string; data: string; id?: string } | { kind: "error"; message: string }
     >();
     channel.onmessage = (frame) => {
       if (closed) return;
       if (frame.kind === "error") onError();
-      else onFrame({ type: frame.event, data: frame.data });
+      else onFrame({ type: frame.event, data: frame.data, id: frame.id });
     };
     const cancel = (id: number) => {
       void invoke("kenkui_events_close", { id }).catch(() => undefined);
     };
-    void invoke("kenkui_events_open", { url, channel }).then((id) => {
+    void invoke("kenkui_events_open", { url, channel, ...(cursor ? {lastEventId:cursor} : {}) }).then((id) => {
       streamId = id as number;
       // Close can race the IPC response when React unmounts or reconnects.
       if (closed) cancel(streamId);

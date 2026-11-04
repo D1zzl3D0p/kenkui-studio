@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { patchCapabilities } from "./capabilities";
+import { mockManagedStudio, patchCapabilities, studioOrigin } from "./capabilities";
 
 test("mobile billing shows pack details, refreshes history, and opens checkout", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await mockManagedStudio(page);
   await patchCapabilities(page, { auth: { mode: "session" }, billing: { mode: "credits" } });
   await page.route("**/v1/auth/session", (route) => route.fulfill({ json: { userId: "billing-reader" } }));
   let balance = "300";
@@ -22,7 +23,7 @@ test("mobile billing shows pack details, refreshes history, and opens checkout",
   await page.route("**/test-checkout", (route) => route.fulfill({
     contentType: "text/html", body: "<h1>Checkout destination</h1>",
   }));
-  await page.goto("/billing");
+  await page.goto(studioOrigin + "/billing");
   await expect(page.getByRole("heading", { name: "Credits", exact: true })).toBeVisible();
   const buy = page.getByRole("button", { name: "Buy 1,100 credits — $10 USD" });
   await expect(buy).toBeVisible();
@@ -42,7 +43,7 @@ test("mobile billing shows pack details, refreshes history, and opens checkout",
   const account = page.getByRole("button", { name: "Account", exact: true });
   await account.click();
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await expect(page.locator(".account-popover form")).toHaveAttribute("method", "post");
+  await expect(page.locator(".account-popover form")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(account).toBeFocused();
   await expect(account).toHaveAttribute("aria-expanded", "false");

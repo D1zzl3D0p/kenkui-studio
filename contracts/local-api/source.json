@@ -1,0 +1,7 @@
+{
+  "repository": "kenkui-server",
+  "commit": "1d63ab904147a43a5baeaac9fd27043fc4735747",
+  "path": "openapi/v1.json",
+  "gitBlob": "145346870a36423bdcdaad286c153770337306f8",
+  "purpose": "Broader Studio/local API, including spoken chapter titles; hosted Neon migration contracts are frozen independently in server contracts/neon/baseline.json. This is a schema source, not a bundled sidecar revision."
+}

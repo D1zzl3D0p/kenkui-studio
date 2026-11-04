@@ -171,3 +171,67 @@ it("replaces stale sockets on resume and ignores events from the old connection"
   expect(onEvent).not.toHaveBeenCalled();
   stream.close();
 });
+
+it("reconnects authenticated fetch SSE with the exact durable sequence and a current snapshot", async () => {
+  const { fetchEventChannel } = await import("../src/host/fetch-event-channel");
+  const { channelEventSourceFactory } =
+    await import("../src/host/channel-event-source");
+  const cursor = "9007199254740993";
+  const payload =
+    '{"sequence":' +
+    cursor +
+    ',"type":"progress","progress":{"stage":"audio","completed":1,"total":2}}';
+  const headers: Headers[] = [];
+  let next: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const request: typeof fetch = async (_url, init) => {
+    headers.push(new Headers(init?.headers));
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        next = controller;
+      },
+    });
+    return new Response(body, {
+      headers: { "Content-Type": "text/event-stream" },
+    });
+  };
+  const eventSource = channelEventSourceFactory((url, id) =>
+    fetchEventChannel(request, url, id),
+  );
+  const getJob = vi.fn().mockResolvedValue({ status: "running" });
+  const client = new KenkuiServerClient("https://api.test", {
+    getJob,
+    eventSource,
+  });
+  const receive = vi.fn();
+  const stream = client.events("job", receive);
+  try {
+    const text =
+      "id: " + cursor + "\r\nevent: progress\r\ndata: " + payload + "\r\n\r\n";
+    for (const byte of new TextEncoder().encode(text))
+      next!.enqueue(new Uint8Array([byte]));
+    next!.close();
+    await vi.waitFor(() => expect(headers).toHaveLength(2));
+    expect(receive).toHaveBeenCalledOnce();
+    expect(getJob).toHaveBeenCalledOnce();
+    expect(headers[1].get("Last-Event-ID")).toBe(cursor);
+  } finally {
+    stream.close();
+  }
+});
+
+it("stops a disconnected stream if its recovery snapshot is permanently unavailable",async()=>{
+  const {KenkuiApiError}=await import("../src/api/errors");
+  vi.useFakeTimers();
+  try{
+    const cause=new KenkuiApiError(404,"Missing job");
+    const getJob=vi.fn().mockRejectedValue(cause), connection=vi.fn();
+    const client=new KenkuiServerClient("https://api.test",{getJob,eventSource:FakeEventSource});
+    client.events("book",undefined,undefined,connection);
+    const source=FakeEventSource.last;
+    source.onerror?.(new Event("error"));
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(connection).toHaveBeenLastCalledWith("disconnected",cause);
+    expect(getJob).toHaveBeenCalledOnce();
+    expect(FakeEventSource.last).toBe(source);
+  }finally{vi.useRealTimers();}
+});

@@ -1,8 +1,10 @@
 pub mod auth;
 #[cfg(feature = "native-shell")]
 mod auth_commands;
+mod credential_store;
 pub mod download;
 pub mod http;
+mod oauth;
 pub mod sidecar;
 #[cfg(feature = "native-shell")]
 mod sidecar_commands;
@@ -14,7 +16,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default();
-    // One process owns credential rotation for each OS user.
+    // Focus the existing window. Secure credential rotation has its own OS lock.
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _, _| {
         if let Some(window) = app.get_webview_window("main") {

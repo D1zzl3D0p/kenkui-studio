@@ -24,10 +24,11 @@ pub async fn download(
     path: &Path,
     mut send: impl FnMut(DownloadMessage) -> Result<(), String>,
 ) -> Result<(), String> {
-    let response = tokio::time::timeout(
-        Duration::from_secs(60),
-        crate::http::authenticated_send(client, sessions, url, client.get(url.clone())),
-    )
+    let response = tokio::time::timeout(Duration::from_secs(60), async {
+        let response =
+            crate::http::authenticated_send(client, sessions, url, client.get(url.clone())).await?;
+        crate::http::artifact_redirect(client, url, response).await
+    })
     .await
     .map_err(|_| "The download timed out")??;
     if response.status() != reqwest::StatusCode::OK {

@@ -14,8 +14,14 @@ use std::{
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum StreamMessage {
-    Event { event: String, data: String },
-    Error { message: String },
+    Event {
+        event: String,
+        data: String,
+        id: String,
+    },
+    Error {
+        message: String,
+    },
 }
 
 /// Keep bytes until a complete line arrives: network chunks can split UTF-8.
@@ -23,6 +29,7 @@ pub enum StreamMessage {
 struct Parser {
     line: Vec<u8>,
     event: String,
+    id: String,
     data: Vec<String>,
     skip_lf: bool,
     started: bool,
@@ -64,10 +71,12 @@ impl Parser {
                         } else {
                             self.event.clone()
                         },
+                        id: self.id.clone(),
                         data: self.data.join("\n"),
                     });
                 }
                 self.event.clear();
+                self.id.clear();
                 self.data.clear();
                 self.pending_bytes = 0;
                 continue;
@@ -78,6 +87,7 @@ impl Parser {
             let (field, value) = line.split_once(':').unwrap_or((line, ""));
             let value = value.strip_prefix(' ').unwrap_or(value);
             match field {
+                "id" => self.id = value.into(),
                 "event" => self.event = value.into(),
                 "data" => self.data.push(value.into()),
                 _ => {}
@@ -98,11 +108,17 @@ async fn forward_events(
     client: reqwest::Client,
     sessions: crate::auth::Sessions,
     url: reqwest::Url,
+    cursor: Option<u64>,
     mut send: impl FnMut(StreamMessage) -> Result<(), String>,
 ) -> Result<(), String> {
     let request = client
         .get(url.clone())
         .header("Accept", "text/event-stream");
+    let request = if let Some(id) = cursor {
+        request.header("Last-Event-ID", id.to_string())
+    } else {
+        request
+    };
     let response = crate::http::authenticated_send(&client, &sessions, &url, request)
         .await?
         .error_for_status()
@@ -136,12 +152,17 @@ async fn forward_events(
 #[tauri::command]
 pub fn kenkui_events_open(
     url: String,
+    last_event_id: Option<String>,
     channel: tauri::ipc::Channel<StreamMessage>,
     streams: tauri::State<'_, Streams>,
     client: tauri::State<'_, reqwest::Client>,
     sessions: tauri::State<'_, crate::auth::Sessions>,
 ) -> Result<u32, String> {
     let url = crate::http::server_url(&url)?;
+    let cursor = last_event_id
+        .map(|id| id.parse::<u64>())
+        .transpose()
+        .map_err(|_| "Invalid event sequence")?;
     let (abort, registration) = AbortHandle::new_pair();
     let id = streams.next_id.fetch_add(1, Ordering::Relaxed);
     {
@@ -159,7 +180,7 @@ pub fn kenkui_events_open(
     let sessions = sessions.inner().clone();
     tauri::async_runtime::spawn(async move {
         let forward = async {
-            if let Err(message) = forward_events(client, sessions, url, |frame| {
+            if let Err(message) = forward_events(client, sessions, url, cursor, |frame| {
                 channel.send(frame).map_err(|error| error.to_string())
             })
             .await
@@ -217,6 +238,7 @@ mod tests {
             crate::http::client().unwrap(),
             crate::auth::Sessions::default(),
             url,
+            None,
             |frame| {
                 frames.push(frame);
                 Ok(())
@@ -230,6 +252,7 @@ mod tests {
 
     fn event(name: &str, data: &str) -> StreamMessage {
         StreamMessage::Event {
+            id: String::new(),
             event: name.into(),
             data: data.into(),
         }

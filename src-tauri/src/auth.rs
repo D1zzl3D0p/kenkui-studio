@@ -1,11 +1,11 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use futures_util::future::{AbortHandle, Abortable};
-use serde::Deserialize;
+
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex as StdMutex},
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -41,92 +41,80 @@ pub fn auth_origin(value: &str) -> Result<String, String> {
     Ok(url.origin().ascii_serialization())
 }
 
-trait SecretStore: Send + Sync {
-    fn read(&self, origin: &str) -> Result<Option<String>, String>;
-    fn write(&self, origin: &str, secret: &str) -> Result<(), String>;
-    fn remove(&self, origin: &str) -> Result<(), String>;
-}
+use crate::credential_store::{CredentialStore, Owner, Record, SecretStore};
+use crate::oauth::{
+    authorities, now, Authorities, Authority, Config, Provider, VerifiedGrant, SCOPES,
+};
+use std::path::PathBuf;
 
-struct CredentialStore;
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-fn entry(origin: &str) -> Result<keyring::Entry, String> {
-    let account = URL_SAFE_NO_PAD.encode(Sha256::digest(origin.as_bytes()));
-    keyring::Entry::new("org.kenkui.studio.refresh", &account)
-        .map_err(|_| "The OS credential store is unavailable".into())
-}
-
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-impl SecretStore for CredentialStore {
-    fn read(&self, origin: &str) -> Result<Option<String>, String> {
-        match entry(origin)?.get_password() {
-            Ok(secret) => Ok(Some(secret)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(_) => Err("Could not read the OS credential store".into()),
-        }
-    }
-    fn write(&self, origin: &str, secret: &str) -> Result<(), String> {
-        entry(origin)?
-            .set_password(secret)
-            .map_err(|_| "Could not save the session in the OS credential store".into())
-    }
-    fn remove(&self, origin: &str) -> Result<(), String> {
-        match entry(origin)?.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(_) => Err("Could not remove the session from the OS credential store".into()),
-        }
-    }
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-impl SecretStore for CredentialStore {
-    fn read(&self, _: &str) -> Result<Option<String>, String> {
-        Err("Mobile sign-in is not available yet".into())
-    }
-    fn write(&self, _: &str, _: &str) -> Result<(), String> {
-        Err("Mobile sign-in is not available yet".into())
-    }
-    fn remove(&self, _: &str) -> Result<(), String> {
-        Err("Mobile sign-in is not available yet".into())
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Grant {
-    access_token: String,
-    refresh_token: String,
-    expires_in: u64,
-}
-
-struct Session {
-    access: String,
+struct Access {
+    credential: RequestCredential,
     refresh: String,
-    expires: Instant,
+    expires: u64,
 }
-
-type SessionSlot = Arc<Mutex<Option<Session>>>;
+/// Kept in Rust through a request. A 401 can only replay under this same login.
+#[derive(Clone)]
+pub struct RequestCredential {
+    pub token: String,
+    subject: String,
+    generation: String,
+    config: Config,
+}
+impl RequestCredential {
+    fn belongs_to(&self, record: &Record) -> bool {
+        self.generation == record.generation
+            && self.subject == record.subject
+            && self.config == record.config
+    }
+}
+#[derive(Default)]
+struct Slot {
+    provider: Option<Provider>,
+    access: Option<Access>,
+}
+type SessionSlot = Arc<Mutex<Slot>>;
 #[derive(Clone)]
 pub struct Sessions {
+    pins: Arc<Result<Authorities, String>>,
     store: Arc<dyn SecretStore>,
+    lock_dir: Option<PathBuf>,
     slots: Arc<Mutex<HashMap<String, SessionSlot>>>,
     login: Arc<Mutex<()>>,
     pending: Arc<StdMutex<Option<AbortHandle>>>,
 }
-
 impl Default for Sessions {
     fn default() -> Self {
-        Self::with_store(Arc::new(CredentialStore))
+        Self::with_store(
+            Arc::new(CredentialStore),
+            None,
+            option_env!("KENKUI_AUTH_AUTHORITIES").unwrap_or("[]"),
+        )
     }
 }
-
 impl Sessions {
-    fn with_store(store: Arc<dyn SecretStore>) -> Self {
+    fn with_store(
+        store: Arc<dyn SecretStore>,
+        lock_dir: Option<PathBuf>,
+        encoded_pins: &str,
+    ) -> Self {
         Self {
+            pins: Arc::new(authorities(encoded_pins)),
             store,
+            lock_dir,
             slots: Arc::default(),
             login: Arc::default(),
             pending: Arc::default(),
         }
+    }
+    fn trusted(&self, origin: &str) -> Result<&Authority, String> {
+        self.pins
+            .as_ref()
+            .as_ref()
+            .map_err(Clone::clone)?
+            .get(origin)
+            .ok_or_else(|| {
+                "This Studio build does not trust hosted sign-in for this server.".into()
+            })
     }
     async fn slot(&self, origin: &str) -> SessionSlot {
         self.slots
@@ -136,125 +124,158 @@ impl Sessions {
             .or_default()
             .clone()
     }
-    async fn read_secret(&self, origin: &str) -> Result<Option<String>, String> {
+    async fn owner(&self, origin: &str) -> Result<Arc<Owner>, String> {
         let store = self.store.clone();
-        let origin = origin.to_string();
-        tokio::task::spawn_blocking(move || store.read(&origin))
+        let dir = match &self.lock_dir {
+            Some(dir) => dir.clone(),
+            None => crate::credential_store::lock_dir()?,
+        };
+        let origin = origin.to_owned();
+        tokio::task::spawn_blocking(move || Owner::acquire(&dir, &origin, store).map(Arc::new))
             .await
-            .map_err(|_| "Credential task failed")?
-    }
-    async fn remove_secret(&self, origin: &str) -> Result<(), String> {
-        let store = self.store.clone();
-        let origin = origin.to_string();
-        tokio::task::spawn_blocking(move || store.remove(&origin))
-            .await
-            .map_err(|_| "Credential task failed")?
+            .map_err(|_| "Credential lock task failed")?
     }
     async fn install(
-        &self,
-        origin: &str,
-        grant: Grant,
-        session: &mut Option<Session>,
+        owner: &Arc<Owner>,
+        slot: &mut Slot,
+        config: Config,
+        grant: VerifiedGrant,
+        generation: String,
     ) -> Result<(), String> {
-        if grant.access_token.is_empty()
-            || grant.refresh_token.is_empty()
-            || !(1..=86400).contains(&grant.expires_in)
-        {
-            return Err("The server returned an invalid native session".into());
-        }
-        let store = self.store.clone();
-        let account = origin.to_string();
-        let secret = grant.refresh_token.clone();
-        tokio::task::spawn_blocking(move || store.write(&account, &secret))
-            .await
-            .map_err(|_| "Credential task failed")??;
-        *session = Some(Session {
-            access: grant.access_token,
-            refresh: grant.refresh_token,
-            expires: Instant::now() + Duration::from_secs(grant.expires_in.saturating_sub(30)),
+        let record = Record {
+            api_origin: owner.origin.clone(),
+            config,
+            generation,
+            subject: grant.subject,
+            refresh: grant.refresh,
+            uncertain: false,
+        };
+        owner.write(&record).await?;
+        slot.access = Some(Access {
+            credential: RequestCredential {
+                token: grant.access,
+                config: record.config,
+                subject: record.subject,
+                generation: record.generation,
+            },
+            expires: grant.expires,
+            refresh: record.refresh,
         });
         Ok(())
-    }
-    async fn refresh(
-        &self,
-        origin: &str,
-        client: &reqwest::Client,
-        secret: String,
-        session: &mut Option<Session>,
-    ) -> Result<(), String> {
-        let response = client
-            .post(format!("{origin}/v1/auth/native/refresh"))
-            .timeout(Duration::from_secs(15))
-            .json(&serde_json::json!({"refreshToken": secret}))
-            .send()
-            .await
-            .map_err(|_| "Could not refresh the session; check your connection")?;
-        if matches!(response.status().as_u16(), 401 | 403) {
-            *session = None;
-            self.remove_secret(origin).await?;
-            return Ok(());
-        }
-        let grant = read_grant(response).await?;
-        self.install(origin, grant, session).await
     }
     pub async fn restore(&self, origin: &str, client: &reqwest::Client) -> Result<(), String> {
         let origin = auth_origin(origin)?;
         let slot = self.slot(&origin).await;
-        let mut session = slot.lock().await;
-        if session.as_ref().is_some_and(|s| s.expires > Instant::now()) {
+        let mut slot = slot.lock().await;
+        let owner = self.owner(&origin).await?;
+        let previous = slot.provider.take();
+        let Some(record) = owner.read().await? else {
+            slot.access = None;
             return Ok(());
-        }
-        let refresh = match session.as_ref() {
-            Some(s) => Some(s.refresh.clone()),
-            None => self.read_secret(&origin).await?,
         };
-        if let Some(refresh) = refresh {
-            self.refresh(&origin, client, refresh, &mut session).await?;
+        let pin = self.trusted(&origin)?;
+        if !record.uncertain && pin.trusts(&record.config) {
+            let config = Config::load(client, pin).await?;
+            if record.config == config {
+                slot.provider = Some(
+                    previous
+                        .filter(|p| p.config == config)
+                        .unwrap_or_else(|| Provider::new(config)),
+                );
+            }
         }
         Ok(())
+    }
+    async fn access(
+        &self,
+        origin: &str,
+        client: &reqwest::Client,
+        used: Option<&RequestCredential>,
+    ) -> Result<Option<RequestCredential>, String> {
+        let Some(slot) = self.slots.lock().await.get(origin).cloned() else {
+            return Ok(None);
+        };
+        let mut slot = slot.lock().await;
+        if slot.provider.is_none() {
+            return Ok(None);
+        }
+        let owner = self.owner(origin).await?;
+        let Some(mut record) = owner.read().await? else {
+            slot.access = None;
+            return Ok(None);
+        };
+        if record.uncertain
+            || !self.trusted(origin)?.trusts(&record.config)
+            || slot.provider.as_ref().unwrap().config != record.config
+        {
+            slot.access = None;
+            return Ok(None);
+        }
+        if used.is_some_and(|original| !original.belongs_to(&record)) {
+            return Ok(None);
+        }
+        if record.generation.is_empty() {
+            // Upgrade an earlier v2 entry once, while holding the shared credential lock.
+            record.generation = random_secret()?;
+            owner.write(&record).await?;
+        }
+        if let Some(access) = &slot.access {
+            if access.expires > now() + 60
+                && access.refresh == record.refresh
+                && access.credential.belongs_to(&record)
+                && used.map(|request| &request.token) != Some(&access.credential.token)
+            {
+                return Ok(Some(access.credential.clone()));
+            }
+        }
+        let provider = slot.provider.as_mut().unwrap();
+        let metadata = provider.discover(client).await?;
+        // Persist before sending a potentially one-use credential. Never replay on restart.
+        record.uncertain = true;
+        owner.write(&record).await?;
+        let grant = provider
+            .exchange(
+                client,
+                &metadata.token_endpoint,
+                &[
+                    ("grant_type", "refresh_token"),
+                    ("refresh_token", &record.refresh),
+                ],
+            )
+            .await;
+        let grant = match grant {
+            Ok(grant) if grant.subject == record.subject => grant,
+            _ => {
+                slot.access = None;
+                return Ok(None);
+            }
+        };
+        Self::install(&owner, &mut slot, record.config, grant, record.generation).await?;
+        Ok(slot.access.as_ref().map(|a| a.credential.clone()))
     }
     pub async fn token_for(
         &self,
         url: &reqwest::Url,
         client: &reqwest::Client,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<RequestCredential>, String> {
         if url.scheme() != "https"
             || !url.path().starts_with("/v1/")
             || url.path().starts_with("/v1/auth/native/")
+            || url.path() == "/v1/capabilities"
         {
             return Ok(None);
         }
-        let origin = url.origin().ascii_serialization();
-        let slot = self.slots.lock().await.get(&origin).cloned();
-        let Some(slot) = slot else {
-            return Ok(None);
-        };
-        let mut session = slot.lock().await;
-        if let Some(s) = session.as_ref() {
-            if s.expires <= Instant::now() {
-                self.refresh(&origin, client, s.refresh.clone(), &mut session)
-                    .await?;
-            }
-        }
-        Ok(session.as_ref().map(|s| s.access.clone()))
+        self.access(&url.origin().ascii_serialization(), client, None)
+            .await
     }
     pub async fn refresh_after_unauthorized(
         &self,
         url: &reqwest::Url,
         client: &reqwest::Client,
-        used: &str,
-    ) -> Result<Option<String>, String> {
-        let origin = url.origin().ascii_serialization();
-        let slot = self.slot(&origin).await;
-        let mut session = slot.lock().await;
-        if let Some(s) = session.as_ref() {
-            // Another request may already have rotated the one-use refresh token.
-            if s.access == used {
-                self.refresh(&origin, client, s.refresh.clone(), &mut session)
-                    .await?;
-            }
-        }
-        Ok(session.as_ref().map(|s| s.access.clone()))
+        used: &RequestCredential,
+    ) -> Result<Option<RequestCredential>, String> {
+        self.access(&url.origin().ascii_serialization(), client, Some(used))
+            .await
     }
     pub fn cancel(&self) {
         if let Ok(mut pending) = self.pending.lock() {
@@ -270,106 +291,114 @@ impl Sessions {
         open: impl FnOnce(&str) -> Result<(), String>,
     ) -> Result<(), String> {
         let origin = auth_origin(origin)?;
-        let _login = self
-            .login
-            .try_lock()
-            .map_err(|_| "A sign-in is already in progress")?;
+        self.sign_in_with(&origin, SIGN_IN_TIMEOUT, async {
+            let config = Config::load(client, self.trusted(&origin)?).await?;
+            let mut provider = Provider::new(config);
+            let grant = browser_grant(&mut provider, client, open).await?;
+            Ok((provider, grant))
+        })
+        .await
+    }
+    async fn sign_in_with(
+        &self,
+        origin: &str,
+        timeout: Duration,
+        grant: impl std::future::Future<Output = Result<(Provider, VerifiedGrant), String>>,
+    ) -> Result<(), String> {
         let (abort, registration) = AbortHandle::new_pair();
+        let _login = {
+            let mut pending = self
+                .pending
+                .lock()
+                .map_err(|_| "Sign-in state unavailable")?;
+            let login = self
+                .login
+                .try_lock()
+                .map_err(|_| "A sign-in is already in progress")?;
+            *pending = Some(abort);
+            login
+        };
+        // Registration precedes every await, including lock acquisition and discovery.
+        let start = async {
+            let slot = self.slot(origin).await.lock_owned().await;
+            let owner = self.owner(origin).await?;
+            let (provider, grant) = grant.await?;
+            Ok::<_, String>((slot, owner, provider, grant))
+        };
+        let result = Abortable::new(tokio::time::timeout(timeout, start), registration).await;
         *self
             .pending
             .lock()
-            .map_err(|_| "Sign-in state is unavailable")? = Some(abort);
-        let result = Abortable::new(
-            tokio::time::timeout(SIGN_IN_TIMEOUT, browser_grant(&origin, client, open)),
-            registration,
-        )
-        .await;
-        *self
-            .pending
-            .lock()
-            .map_err(|_| "Sign-in state is unavailable")? = None;
-        let grant = result
+            .map_err(|_| "Sign-in state unavailable")? = None;
+        let (mut slot, owner, provider, grant) = result
             .map_err(|_| "Sign-in cancelled")?
             .map_err(|_| "Sign-in timed out; please try again")??;
-        // Persist outside the cancellable future. Logout waits for this write.
-        let slot = self.slot(&origin).await;
-        let mut session = slot.lock().await;
-        self.install(&origin, grant, &mut session).await
+        Self::install(
+            &owner,
+            &mut slot,
+            provider.config.clone(),
+            grant,
+            random_secret()?,
+        )
+        .await?;
+        slot.provider = Some(provider);
+        Ok(())
     }
-    pub async fn sign_out(&self, origin: &str, client: &reqwest::Client) -> Result<(), String> {
+    pub async fn sign_out(&self, origin: &str, client: &reqwest::Client) -> Result<bool, String> {
         let origin = auth_origin(origin)?;
         self.cancel();
         let _login = self.login.lock().await;
         let slot = self.slot(&origin).await;
-        let mut session = slot.lock().await;
-        // Restore once to revoke a session even after restarting the app.
-        if session.is_none() {
-            if let Some(secret) = self.read_secret(&origin).await? {
-                let _ = self.refresh(&origin, client, secret, &mut session).await;
+        let mut slot = slot.lock().await;
+        let owner = self.owner(&origin).await?;
+        let revoked = match owner.read().await {
+            Ok(Some(record)) => {
+                // Reuse validated live config, or bootstrap against the pin on cold logout.
+                let revoke = async {
+                    let pin = self.trusted(&origin)?;
+                    if !pin.trusts(&record.config) {
+                        return Err("Saved sign-in authority changed".to_string());
+                    }
+                    let mut provider =
+                        match slot.provider.take().filter(|p| p.config == record.config) {
+                            Some(provider) => provider,
+                            None => Provider::new(Config::load(client, pin).await?),
+                        };
+                    provider.revoke(client, &record.refresh).await
+                };
+                revoke.await.is_ok()
             }
-        }
-        let token = session.as_ref().map(|s| s.access.clone());
-        self.remove_secret(&origin).await?;
-        *session = None;
-        if let Some(token) = token {
-            // Local sign-out still succeeds offline; server revocation is best effort.
-            let _ = client
-                .post(format!("{origin}/v1/auth/native/logout"))
-                .timeout(Duration::from_secs(10))
-                .bearer_auth(token)
-                .send()
-                .await;
-        }
-        Ok(())
-    }
-}
-
-async fn read_grant(response: reqwest::Response) -> Result<Grant, String> {
-    match response.status().as_u16() {
-        200 => response
-            .json()
-            .await
-            .map_err(|_| "The server returned an invalid native session".into()),
-        401 => Err("Your session has expired. Please sign in again".into()),
-        403 => Err("Sign in with an invited account to continue".into()),
-        404 => Err("Native sign-in is not enabled on this server".into()),
-        _ => Err("The authentication service is unavailable; please try again".into()),
+            Ok(None) => true,
+            Err(_) => false,
+        };
+        owner.clear().await?;
+        *slot = Slot::default();
+        Ok(revoked)
     }
 }
 
 async fn browser_grant(
-    origin: &str,
+    provider: &mut Provider,
     client: &reqwest::Client,
     open: impl FnOnce(&str) -> Result<(), String>,
-) -> Result<Grant, String> {
-    let response = client
-        .get(format!("{origin}/v1/auth/native/config"))
-        .timeout(Duration::from_secs(10))
-        .send()
-        .await
-        .map_err(|_| "Could not contact the sign-in service")?;
-    if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Err("Native sign-in is not enabled on this server".into());
-    }
-    if !response.status().is_success() {
-        return Err("The sign-in service is unavailable".into());
-    }
-    let config: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|_| "Invalid native sign-in configuration")?;
-    if config["redirectUri"].as_str() != Some(REDIRECT_URI) {
-        return Err("This server requires an unsupported sign-in callback".into());
-    }
+) -> Result<VerifiedGrant, String> {
     let listener = TcpListener::bind("127.0.0.1:43827").await.map_err(|_| {
         "Could not open the sign-in callback. Close any other Kenkui sign-in and retry"
     })?;
+    let metadata = provider.discover(client).await?;
     let state = random_secret()?;
     let verifier = random_secret()?;
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
-    let mut authorize = reqwest::Url::parse(&format!("{origin}/v1/auth/native/authorize")).unwrap();
+    let mut authorize = reqwest::Url::parse(&metadata.authorization_endpoint)
+        .map_err(|_| "Invalid authorize endpoint")?;
     authorize
         .query_pairs_mut()
+        .append_pair("response_type", "code")
+        .append_pair("client_id", &provider.config.client_id)
+        .append_pair("redirect_uri", REDIRECT_URI)
+        .append_pair("scope", SCOPES)
+        .append_pair("resource", &provider.config.resource)
+        .append_pair("code_challenge_method", "S256")
         .append_pair("state", &state)
         .append_pair("code_challenge", &challenge);
     open(authorize.as_str())?;
@@ -398,7 +427,7 @@ async fn browser_grant(
         .flatten();
         let callback = request
             .as_deref()
-            .and_then(|request| callback_code(request, &state));
+            .and_then(|request| callback_code(request, &state, &provider.config.issuer));
         let Some(code) = callback else {
             let _ = socket
                 .write_all(
@@ -413,38 +442,53 @@ async fn browser_grant(
         let _ = socket.write_all(message).await;
         let _ = socket.shutdown().await;
         let code = code?;
-        let response = client
-            .post(format!("{origin}/v1/auth/native/exchange"))
-            .timeout(Duration::from_secs(15))
-            .json(&serde_json::json!({"code": code, "codeVerifier": verifier}))
-            .send()
-            .await
-            .map_err(|_| "Could not complete sign-in; please try again")?;
-        return read_grant(response).await;
+        return provider
+            .exchange(
+                client,
+                &metadata.token_endpoint,
+                &[
+                    ("grant_type", "authorization_code"),
+                    ("code", &code),
+                    ("code_verifier", &verifier),
+                    ("redirect_uri", REDIRECT_URI),
+                ],
+            )
+            .await;
     }
 }
 
 /// Invalid/foreign callbacks do not consume the active login attempt.
-fn callback_code(request: &str, expected: &str) -> Option<Result<String, String>> {
+fn callback_code(request: &str, expected: &str, issuer: &str) -> Option<Result<String, String>> {
     let mut lines = request.split("\r\n");
     let mut request_line = lines.next()?.split_whitespace();
     if request_line.next()? != "GET" {
         return None;
     }
     let target = request_line.next()?;
-    if !target.starts_with("/callback?") {
+    if request_line.next()? != "HTTP/1.1"
+        || request_line.next().is_some()
+        || target.contains('#')
+        || !target.starts_with("/callback?")
+    {
         return None;
     }
-    let host = lines
+    let mut hosts = lines
+        .take_while(|line| !line.is_empty())
         .filter_map(|line| line.split_once(':'))
-        .find(|(name, _)| name.eq_ignore_ascii_case("host"))?
-        .1
-        .trim();
-    if host != "127.0.0.1:43827" {
+        .filter(|(name, _)| name.eq_ignore_ascii_case("host"));
+    if hosts.next()?.1.trim() != "127.0.0.1:43827" || hosts.next().is_some() {
         return None;
     }
     let url = reqwest::Url::parse(&format!("http://127.0.0.1:43827{target}")).ok()?;
     let pairs: Vec<_> = url.query_pairs().collect();
+    let mut seen = std::collections::HashSet::new();
+    if pairs.iter().any(|(name, _)| !seen.insert(name.as_ref()))
+        || !pairs
+            .iter()
+            .any(|(name, value)| name == "iss" && value == issuer)
+    {
+        return None;
+    }
     let states: Vec<_> = pairs.iter().filter(|(name, _)| name == "state").collect();
     if states.len() != 1 || states[0].1 != expected {
         return None;
@@ -461,221 +505,5 @@ fn callback_code(request: &str, expected: &str) -> Option<Result<String, String>
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Default)]
-    struct MemoryStore(StdMutex<HashMap<String, String>>);
-    impl SecretStore for MemoryStore {
-        fn read(&self, origin: &str) -> Result<Option<String>, String> {
-            Ok(self.0.lock().unwrap().get(origin).cloned())
-        }
-        fn write(&self, origin: &str, secret: &str) -> Result<(), String> {
-            self.0.lock().unwrap().insert(origin.into(), secret.into());
-            Ok(())
-        }
-        fn remove(&self, origin: &str) -> Result<(), String> {
-            self.0.lock().unwrap().remove(origin);
-            Ok(())
-        }
-    }
-    async fn cached(sessions: &Sessions, origin: &str, access: &str, lifetime: u64) {
-        let slot = sessions.slot(origin).await;
-        sessions
-            .install(
-                origin,
-                Grant {
-                    access_token: access.into(),
-                    refresh_token: "refresh".into(),
-                    expires_in: lifetime,
-                },
-                &mut *slot.lock().await,
-            )
-            .await
-            .unwrap();
-    }
-    fn callback(query: &str) -> String {
-        format!("GET /callback?{query} HTTP/1.1\r\nHost: 127.0.0.1:43827\r\n\r\n")
-    }
-    #[test]
-    fn creates_valid_pkce_and_matches_rfc_challenge() {
-        assert!(verifier_is_valid(&random_secret().unwrap()));
-        assert!(!verifier_is_valid("short"));
-        assert!(!verifier_is_valid(&"!".repeat(43)));
-        assert_eq!(
-            URL_SAFE_NO_PAD.encode(Sha256::digest(
-                b"dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-            )),
-            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
-        );
-    }
-    #[test]
-    fn callbacks_require_exact_state_host_path_and_unambiguous_code() {
-        assert_eq!(
-            callback_code(&callback("state=expected&code=ok"), "expected"),
-            Some(Ok("ok".into()))
-        );
-        for query in [
-            "state=wrong&code=ok",
-            "state=expected&state=expected&code=ok",
-            "state=expected&code=a&code=b",
-            "state=expected&code=a&error=denied",
-        ] {
-            assert_eq!(callback_code(&callback(query), "expected"), None);
-        }
-        assert_eq!(
-            callback_code(&callback("state=expected&error=denied"), "expected"),
-            Some(Err("Sign-in was declined or cancelled".into()))
-        );
-        assert_eq!(
-            callback_code(
-                &callback("state=expected&code=ok")
-                    .replace("Host: 127.0.0.1:43827", "Host: attacker.test"),
-                "expected"
-            ),
-            None
-        );
-        assert_eq!(
-            callback_code(
-                &callback("state=expected&code=ok").replace("/callback?", "/other?"),
-                "expected"
-            ),
-            None
-        );
-    }
-    #[test]
-    fn rejects_insecure_and_ambiguous_auth_origins() {
-        for origin in [
-            "http://example.com",
-            "https://user:pass@example.com",
-            "https://example.com/path",
-            "https://example.com?query",
-            "https://example.com/#fragment",
-        ] {
-            assert!(auth_origin(origin).is_err());
-        }
-        assert_eq!(
-            auth_origin("https://EXAMPLE.COM:443/").unwrap(),
-            "https://example.com"
-        );
-    }
-    #[tokio::test]
-    async fn credentials_are_isolated_by_origin_and_only_refresh_secret_is_persisted() {
-        let store = Arc::new(MemoryStore::default());
-        let sessions = Sessions::with_store(store.clone());
-        let client = crate::http::client().unwrap();
-        cached(&sessions, "https://api.test", "private-access", 300).await;
-        assert_eq!(
-            store.read("https://api.test").unwrap(),
-            Some("refresh".into())
-        );
-        let trusted = reqwest::Url::parse("https://api.test/v1/jobs").unwrap();
-        assert_eq!(
-            sessions.token_for(&trusted, &client).await.unwrap(),
-            Some("private-access".into())
-        );
-        for address in [
-            "https://other.test/v1/jobs",
-            "http://api.test/v1/jobs",
-            "https://api.test:444/v1/jobs",
-            "https://api.test/unrelated",
-            "https://api.test/v1/auth/native/config",
-        ] {
-            assert_eq!(
-                sessions
-                    .token_for(&reqwest::Url::parse(address).unwrap(), &client)
-                    .await
-                    .unwrap(),
-                None
-            );
-        }
-    }
-
-    async fn mock_refresh(status: u16) -> (String, tokio::task::JoinHandle<String>) {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let origin = format!("http://{}", listener.local_addr().unwrap());
-        let task = tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.unwrap();
-            let mut bytes = vec![0; 8192];
-            let count = socket.read(&mut bytes).await.unwrap();
-            let request = String::from_utf8_lossy(&bytes[..count]).to_string();
-            let body =
-                r#"{"accessToken":"new-access","refreshToken":"rotated-refresh","expiresIn":300}"#;
-            let response = format!("HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
-            socket.write_all(response.as_bytes()).await.unwrap();
-            request
-        });
-        (origin, task)
-    }
-    #[tokio::test]
-    async fn concurrent_unauthorized_requests_rotate_the_refresh_token_only_once() {
-        let (origin, task) = mock_refresh(200).await;
-        let store = Arc::new(MemoryStore::default());
-        let sessions = Sessions::with_store(store.clone());
-        cached(&sessions, &origin, "old-access", 300).await;
-        let url = reqwest::Url::parse(&format!("{origin}/v1/jobs")).unwrap();
-        let client = crate::http::client().unwrap();
-        let (one, two) = tokio::join!(
-            sessions.refresh_after_unauthorized(&url, &client, "old-access"),
-            sessions.refresh_after_unauthorized(&url, &client, "old-access"),
-        );
-        assert_eq!(one.unwrap(), Some("new-access".into()));
-        assert_eq!(two.unwrap(), Some("new-access".into()));
-        assert_eq!(store.read(&origin).unwrap(), Some("rotated-refresh".into()));
-        assert!(task
-            .await
-            .unwrap()
-            .starts_with("POST /v1/auth/native/refresh"));
-    }
-    #[tokio::test]
-    async fn rejected_refresh_clears_credentials_but_provider_outage_preserves_them() {
-        for status in [401, 403, 503] {
-            let (origin, task) = mock_refresh(status).await;
-            let store = Arc::new(MemoryStore::default());
-            let sessions = Sessions::with_store(store.clone());
-            cached(&sessions, &origin, "old-access", 300).await;
-            let url = reqwest::Url::parse(&format!("{origin}/v1/jobs")).unwrap();
-            let result = sessions
-                .refresh_after_unauthorized(&url, &crate::http::client().unwrap(), "old-access")
-                .await;
-            if status == 503 {
-                assert!(result.is_err());
-                assert_eq!(store.read(&origin).unwrap(), Some("refresh".into()));
-            } else {
-                assert_eq!(result.unwrap(), None);
-                assert_eq!(store.read(&origin).unwrap(), None);
-            }
-            task.await.unwrap();
-        }
-    }
-    #[tokio::test]
-    async fn fresh_install_without_credentials_does_not_contact_the_auth_server() {
-        let sessions = Sessions::with_store(Arc::new(MemoryStore::default()));
-        sessions
-            .restore("https://offline.invalid", &crate::http::client().unwrap())
-            .await
-            .unwrap();
-    }
-
-    #[tokio::test]
-    async fn offline_sign_out_removes_saved_and_memory_credentials() {
-        let store = Arc::new(MemoryStore::default());
-        let sessions = Sessions::with_store(store.clone());
-        let origin = "https://127.0.0.1:1";
-        cached(&sessions, origin, "access", 300).await;
-        let client = crate::http::client().unwrap();
-        sessions.sign_out(origin, &client).await.unwrap();
-        assert_eq!(store.read(origin).unwrap(), None);
-        assert_eq!(
-            sessions
-                .token_for(
-                    &reqwest::Url::parse(&format!("{origin}/v1/jobs")).unwrap(),
-                    &client
-                )
-                .await
-                .unwrap(),
-            None
-        );
-        sessions.restore(origin, &client).await.unwrap();
-    }
-}
+#[path = "auth_tests.rs"]
+mod tests;

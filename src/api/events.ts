@@ -1,3 +1,4 @@
+import { isTransientRequestError } from "./errors";
 import type { EventResponse, JobResponse } from "./generated/v1";
 
 export interface JobEventStream {
@@ -12,7 +13,7 @@ export interface EventSourceLike {
   close(): void;
 }
 
-export type EventSourceFactory = new (url: string, options?: EventSourceInit) => EventSourceLike;
+export type EventSourceFactory = new (url: string, options?: EventSourceInit & {lastEventId?: string}) => EventSourceLike;
 
 const terminalStatuses: Record<string, true> = { succeeded: true, failed: true, cancelled: true };
 const snapshotEvents: Record<string, true> = { completed: true, cancel_requested: true, failed: true, cancelled: true };
@@ -24,7 +25,8 @@ export function connectJobEvents(
   refetch: () => Promise<JobResponse>,
   onEvent?: (event: EventResponse) => void,
   onSnapshot?: (job: JobResponse) => void,
-  onConnection?: (state: "connected" | "reconnecting" | "disconnected") => void,
+  onConnection?: (state: "connected" | "reconnecting" | "disconnected", cause?: unknown) => void,
+  cursor?: {lastEventId: string; onCursor(id: string): void},
 ): JobEventStream {
   let source: EventSourceLike | undefined;
   let stopped = false;
@@ -34,7 +36,8 @@ export function connectJobEvents(
   let resuming: Promise<JobResponse> | undefined;
   let attempts = 0;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
-  let lastSequence = 0;
+  let lastSequence = BigInt(cursor?.lastEventId || 0);
+  let latest: JobResponse | undefined;
   let revision = 0;
   let recovering: Promise<JobResponse> | undefined;
 
@@ -51,6 +54,7 @@ export function connectJobEvents(
     recovering ??= refetch().then((job) => {
       if (stopped) return job;
       if (requestedAt === revision) {
+        latest = job;
         onSnapshot?.(job);
         if (terminalStatuses[job.status]) { finished = true; stop(); }
       }
@@ -61,19 +65,30 @@ export function connectJobEvents(
   const receive = (message: MessageEvent<string>) => {
     try {
       const event = JSON.parse(message.data) as EventResponse;
-      if (stopped || !Number.isInteger(event.sequence) || event.sequence <= lastSequence) return;
+      const id =
+        message.lastEventId ||
+        (Number.isSafeInteger(event.sequence) ? String(event.sequence) : "");
+      if (
+        stopped ||
+        !Number.isInteger(event.sequence) ||
+        event.sequence !== Number(id) ||
+        !/^[1-9][0-9]{0,18}$/.test(id) ||
+        BigInt(id) <= lastSequence
+      )
+        return;
       if (!event.progress || typeof event.type !== "string") return;
-      lastSequence = event.sequence;
+      lastSequence = BigInt(id);
+      cursor?.onCursor(id);
       revision += 1;
       attempts = 0;
       onConnection?.("connected");
       onEvent?.(event);
-      if (snapshotEvents[event.type]) void recover().catch(() => onConnection?.("disconnected"));
+      if (snapshotEvents[event.type]) void recover().catch(cause => {if (!stopped) {stop(); onConnection?.("disconnected",cause);}});
     } catch { /* malformed display event */ }
   };
   const connect = () => {
     if (stopped) return;
-    const next = new EventSourceConstructor(url, { withCredentials: true });
+    const next = new EventSourceConstructor(url, { lastEventId: lastSequence.toString() });
     source = next;
     const receiveCurrent = (message: MessageEvent<string>) => { if (source === next) receive(message); };
     next.onmessage = receiveCurrent;
@@ -89,8 +104,10 @@ export function connectJobEvents(
       void recover().then((job) => {
         if (stopped || reconnectGeneration !== generation || terminalStatuses[job.status]) return;
         retryTimer = setTimeout(connect, attempts * 100);
-      }).catch(() => {
-        if (!stopped && reconnectGeneration === generation) retryTimer = setTimeout(connect, attempts * 100);
+      }).catch(cause => {
+        if (stopped || reconnectGeneration !== generation) return;
+        if (!isTransientRequestError(cause)) {stop(); onConnection?.("disconnected",cause); return;}
+        retryTimer = setTimeout(connect, attempts * 100);
       });
     };
   };
@@ -98,7 +115,7 @@ export function connectJobEvents(
   return {
     close: () => { disposed = true; stop(); },
     onDisconnect: () => {
-      if (disposed || finished) return recover();
+      if (disposed || finished) return latest ? Promise.resolve(latest) : Promise.reject(new Error("Stream closed"));
       if (resuming) return resuming;
       // A mobile suspension can exhaust retries or leave an apparently live socket.
       stop();

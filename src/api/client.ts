@@ -1,4 +1,4 @@
-import { asApiError } from "./errors";
+import { asApiError, type KenkuiApiError } from "./errors";
 import {
   connectJobEvents,
   type EventSourceFactory,
@@ -35,9 +35,7 @@ export class KenkuiServerClient {
     dependencies: ClientDependencies = {},
   ) {
     this.request = dependencies.fetch ?? globalThis.fetch.bind(globalThis);
-    this.EventSourceConstructor =
-      dependencies.eventSource ??
-      (globalThis.EventSource as unknown as EventSourceFactory | undefined);
+    this.EventSourceConstructor = dependencies.eventSource;
     this.getJobOverride = dependencies.getJob;
   }
 
@@ -45,12 +43,26 @@ export class KenkuiServerClient {
 
   onUnauthorized(listener: () => void): () => void {
     this.unauthorized.add(listener);
-    return () => { this.unauthorized.delete(listener); };
+    return () => {
+      this.unauthorized.delete(listener);
+    };
+  }
+
+  private readonly recovery = new Set<(error: KenkuiApiError) => void>();
+  onRecoveryRequired(listener: (error: KenkuiApiError) => void) {
+    this.recovery.add(listener);
+    return () => {
+      this.recovery.delete(listener);
+    };
   }
 
   private async responseError(response: Response) {
-    if (response.status === 401) this.unauthorized.forEach((listener) => listener());
-    return asApiError(response);
+    if (response.status === 401)
+      this.unauthorized.forEach((listener) => listener());
+    const error = await asApiError(response);
+    if (error.status === 409 && error.code === "recovery_required")
+      this.recovery.forEach((fn) => fn(error));
+    return error;
   }
 
   storageScope(): string {
@@ -59,10 +71,25 @@ export class KenkuiServerClient {
   async session(): Promise<{ userId: string }> {
     return this.json("/v1/auth/session");
   }
+  async challenge(legacyEmail: string): Promise<{ challengeId: string }> {
+    return this.json(
+      "/v1/auth/migration/challenge",
+      this.jsonBody({ legacyEmail }),
+    );
+  }
+  async verify(challengeId: string, code: string): Promise<{ userId: string }> {
+    return this.json(
+      "/v1/auth/migration/verify",
+      this.jsonBody({ challengeId, code }),
+    );
+  }
+  async onboard(): Promise<{ userId: string }> {
+    return this.json("/v1/auth/onboarding", this.jsonBody({}));
+  }
   async cover(assetId: string): Promise<Blob> {
     const response = await this.request(
       this.url(`/v1/assets/${encodeURIComponent(assetId)}/cover`),
-      { credentials: "include" },
+      { credentials: "omit" },
     );
     if (!response.ok) throw await this.responseError(response);
     return response.blob();
@@ -75,17 +102,15 @@ export class KenkuiServerClient {
     });
   }
 
-  authUrl(action: "login" | "logout"): string {
-    return this.url(`/v1/auth/${action}`);
-  }
-
   async capabilities(): Promise<Capabilities> {
     return this.json("/v1/capabilities");
   }
   async billing(): Promise<BillingResponse> {
     return this.json("/v1/billing");
   }
-  async creditHistory(): Promise<import("./generated/v1").CreditHistoryResponse> {
+  async creditHistory(): Promise<
+    import("./generated/v1").CreditHistoryResponse
+  > {
     return this.json("/v1/billing/history");
   }
   async checkout(credits: number): Promise<{ url: string }> {
@@ -125,7 +150,10 @@ export class KenkuiServerClient {
     payload: JobRequest,
     signal?: AbortSignal,
   ): Promise<PreflightResponse> {
-    return this.json("/v1/jobs/preflight", { ...this.jsonBody(payload), signal });
+    return this.json("/v1/jobs/preflight", {
+      ...this.jsonBody(payload),
+      signal,
+    });
   }
   async jobs(): Promise<JobListResponse> {
     return this.json("/v1/jobs");
@@ -162,7 +190,7 @@ export class KenkuiServerClient {
   async artifact(jobId: string): Promise<Blob> {
     const response = await this.request(
       this.url(`/v1/jobs/${encodeURIComponent(jobId)}/artifact`),
-      { credentials: "include" },
+      { credentials: "omit" },
     );
     if (!response.ok) throw await this.responseError(response);
     return response.blob();
@@ -174,7 +202,9 @@ export class KenkuiServerClient {
     onSnapshot?: (job: JobResponse) => void,
     onConnection?: (
       state: "connected" | "reconnecting" | "disconnected",
+      cause?: unknown,
     ) => void,
+    cursor?: { lastEventId: string; onCursor(id: string): void },
   ): JobEventStream {
     if (!this.EventSourceConstructor)
       throw new Error("This browser does not support server-sent events.");
@@ -185,6 +215,7 @@ export class KenkuiServerClient {
       onEvent,
       onSnapshot,
       onConnection,
+      cursor,
     );
   }
 
@@ -197,7 +228,7 @@ export class KenkuiServerClient {
   }
   private async json<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await this.request(this.url(path), {
-      credentials: "include",
+      credentials: "omit",
       ...init,
     });
     if (!response.ok) throw await this.responseError(response);

@@ -1,3 +1,4 @@
+import { isTransientRequestError } from "../api/errors";
 import { useEffect, useRef, useState } from "react";
 import type { KenkuiServerClient } from "../api/client";
 import type {
@@ -70,6 +71,7 @@ export function Studio({
       return "system";
     }
   });
+  const lastListHadActiveJobs = useRef(false);
   const input = useRef<HTMLInputElement>(null),
     dialog = useRef<HTMLDialogElement>(null),
     uploading = useRef(false),
@@ -123,28 +125,50 @@ export function Studio({
   useEffect(() => {
     let live = true,
       fetching = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0,
+      permanentFailure = false;
+    const schedule = () => {
+      if (document.visibilityState === "visible")
+        timer = setTimeout(() => void load(), 15000);
+    };
     const load = async () => {
-      if (fetching) return;
+      if (permanentFailure || fetching || document.visibilityState !== "visible") return;
+      clearTimeout(timer);
       fetching = true;
       try {
         const result = await client.jobs();
         if (live) {
           setJobs(result.items);
           setJobsError(undefined);
+          failures = 0;
+          lastListHadActiveJobs.current = result.items.some((job) =>
+            ["queued", "running", "cancel_requested"].includes(job.status),
+          );
+          if (lastListHadActiveJobs.current) schedule();
         }
       } catch (cause) {
-        if (live) setJobsError(cause);
+        if (live) {
+          setJobsError(cause);
+          permanentFailure = !isTransientRequestError(cause);
+          // The retry budget governs timers. A foreground return can recheck a transient failure.
+          if (!permanentFailure && lastListHadActiveJobs.current && ++failures <= 3)
+            schedule();
+        }
       } finally {
         fetching = false;
       }
     };
     void load();
-    const timer = setInterval(() => {
+    const visibility = () => {
+      clearTimeout(timer);
       if (document.visibilityState === "visible") void load();
-    }, 15000);
+    };
+    document.addEventListener("visibilitychange", visibility);
     return () => {
       live = false;
-      clearInterval(timer);
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", visibility);
     };
   }, [client, refresh]);
   useEffect(() => {

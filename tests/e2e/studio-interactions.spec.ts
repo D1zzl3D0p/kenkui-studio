@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { patchCapabilities } from "./capabilities";
+import { mockManagedStudio, patchCapabilities, studioOrigin } from "./capabilities";
 
 test("dropping an EPUB opens its draft and settings remain open when revisited", async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 720 });
@@ -36,11 +36,12 @@ test("dropping an EPUB opens its draft and settings remain open when revisited",
   await transfer.dispose();
 });
 
-test("expired sessions replace the whole studio and sign-in goes directly to AuthKit", async ({ page }) => {
+test("expired sessions replace the studio and offer the two managed social providers", async ({ page }) => {
+  await mockManagedStudio(page);
   await patchCapabilities(page, { auth: { mode: "session" }, billing: { mode: "credits" } });
   await page.route("**/v1/auth/session", route => route.fulfill({ json: { userId: "reader" } }));
   await page.route("**/v1/billing", route => route.fulfill({ json: { availableCredits: "500", checkoutEnabled: "true" } }));
-  await page.goto("/");
+  await page.goto(studioOrigin + "/");
   await expect(page.getByRole("button", { name: "Choose file" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Billing", exact: true })).toContainText("500");
   await page.route("**/v1/billing", route => route.fulfill({ status: 401, json: { error: { code: "unauthenticated", message: "Sign in to continue.", requestId: "test-request" } } }));
@@ -49,10 +50,9 @@ test("expired sessions replace the whole studio and sign-in goes directly to Aut
   await expect(page.getByRole("navigation")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Choose file" })).toHaveCount(0);
   await expect(page.getByText(/test-request/)).toHaveCount(0);
-  await expect(page).toHaveURL("/");
-  await page.route("**/v1/auth/login", route => route.fulfill({ contentType: "text/html", body: "<h1>AuthKit destination</h1>" }));
-  await page.getByRole("link", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "AuthKit destination" })).toBeVisible();
-  await page.goto("/sign-in");
-  await expect(page.getByRole("heading", { name: "AuthKit destination" })).toBeVisible();
+  await expect(page).toHaveURL(studioOrigin + "/");
+  const social = page.waitForRequest(request => request.url().endsWith("/sign-in/social") && request.method() === "POST");
+  await expect(page.getByRole("button", {name:"Continue with GitHub"})).toBeVisible();
+  await page.getByRole("button", {name:"Continue with Google"}).click();
+  expect((await social).postDataJSON()).toMatchObject({provider:"google"});
 });

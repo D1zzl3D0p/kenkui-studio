@@ -50,9 +50,7 @@ export function AccountMenu({ client, signedIn, initiallyOpen = false, auth, hos
       <p className="quiet">{signedIn ? "Signed in" : "Your account"}</p>
       {signedIn && host && capabilities &&
         <NotificationSettings client={client} host={host} capabilities={capabilities} />}
-      {auth ? <NativeAuthAction auth={auth} origin={client.storageScope()} action={signedIn ? "signOut" : "signIn"} /> : signedIn
-        ? <form method="post" action={client.authUrl("logout")}><button className="secondary full" type="submit">Sign out</button></form>
-        : <a className="primary" href={client.authUrl("login")}>Sign in</a>}
+      {auth ? <NativeAuthAction auth={auth} origin={client.storageScope()} action={signedIn ? "signOut" : "signIn"} /> : <p>Sign-in is unavailable on this platform.</p>}
     </div>}
   </div>;
 }
