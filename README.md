@@ -190,31 +190,29 @@ the server's unauthenticated local mode with no allowed browser CORS origins.
 ## Hosted deployment
 
 Cloudflare Static Assets configuration is in `wrangler.jsonc`. Run
-`npm run deploy:staging -- --dry-run` to build with the staging API origin and
-validate deployment, then omit `--dry-run` to publish. Use `deploy:production`
-for the production origin. See the server's `deploy/production.md` for the
-complete release sequence and account prerequisites.
+`npm run deploy:production -- --dry-run` to build with the production API origin
+and validate deployment, then omit `--dry-run` to publish after release approval.
+See the server's `deploy/neon/prelaunch-production.md` for the complete sequence.
 
 `release/auth-authorities.json` is the single reviewed public input.
 `scripts/release-config.mjs` validates it before either deployment/build command
 and derives both web and Rust arrays identically, including the selected native
-API origin. Staging has the actual reviewed public values; production is empty
-and official production release/deploy **fails before building/publishing** until
-its real provider/client pins are reviewed. Do not discover or guess them.
+API origin. Production now carries the reviewed authority for the reused Neon
+branch; staging has no official authority. Do not discover or guess new pins.
 
 Native workflow runs on PRs/main produce clearly named `local` QA artifacts,
-without hosted pins or publication. For staging QA, manually dispatch from main
-with `release_environment=staging`; every build uses the same validated staging
+without hosted pins or publication. For hosted QA, manually dispatch from main
+with `release_environment=production`; every build uses the same validated production
 pin and `VITE_KENKUI_NATIVE_API_ORIGIN`. Official targets use the corresponding
 GitHub environment; confirm required reviewers/branch restrictions separately.
 The workflow has no release-store/publication action and bundles no Python/core
 sidecar. Keep the existing local launcher unchanged. Local/no-auth builds need
-no authority. Staging deployment waits for the server's coordinated Task13
-restore/writer-freeze/readiness gate, not merely a successful build.
+no authority. A successful build alone does not establish live login, payment
+or rendering acceptance.
 
-For local staging QA use `node scripts/release-config.mjs staging -- npm run desktop:build`
+For local hosted QA use `node scripts/release-config.mjs production -- npm run desktop:build`
 (or `build:native` for the frontend only). This sets both public pin variables
-and the native staging origin in the same build process.
+and the native production origin in the same build process.
 
 ### Hosted sign-in trust configuration
 
